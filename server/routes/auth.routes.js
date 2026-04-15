@@ -38,7 +38,8 @@ router.get('/google',
 router.get('/google/callback',
   passport.authenticate('google', { session: false, failureRedirect: '/login' }),
   (req, res) => {
-    const accessToken = generateAccessToken(req.user._id);
+    // Embed role in access token
+    const accessToken = generateAccessToken(req.user._id, req.user.role);
     const refreshToken = generateRefreshToken(req.user._id);
 
     res.cookie('refreshToken', refreshToken, {
@@ -48,7 +49,10 @@ router.get('/google/callback',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${accessToken}`);
+    // Pass role so frontend can redirect correctly
+    res.redirect(
+      `${process.env.CLIENT_URL}/auth/callback?token=${accessToken}&role=${req.user.role}`
+    );
   }
 );
 

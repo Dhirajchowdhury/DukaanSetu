@@ -3,7 +3,7 @@ const bcrypt = require('bcrypt');
 
 const ROLES = ['shop_owner', 'distributor', 'wholesaler', 'producer'];
 
-const ROLES = ['shop_owner', 'distributor', 'wholesaler', 'producer'];
+//const ROLES = ['shop_owner', 'distributor', 'wholesaler', 'producer'];
 
 const userSchema = new mongoose.Schema({
   email: {

@@ -4,11 +4,11 @@ import {
   FiHome, FiBox, FiTag, FiBarChart2, FiSettings,
   FiLogOut, FiMenu, FiX, FiChevronRight,
 } from 'react-icons/fi';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth, getDashboardPath } from '../../context/AuthContext';
 import './Sidebar.css';
 
 const NAV_ITEMS = [
-  { path: '/dashboard',  icon: <FiHome />,     label: 'Dashboard' },
+  { path: null,          icon: <FiHome />,     label: 'Dashboard', isDashboard: true },
   { path: '/products',   icon: <FiBox />,      label: 'Products' },
   { path: '/categories', icon: <FiTag />,      label: 'Categories' },
   { path: '/reports',    icon: <FiBarChart2 />, label: 'Reports' },
@@ -62,11 +62,15 @@ const Sidebar = () => {
       <nav className="sidebar__nav">
         <p className="sidebar__nav-label">Menu</p>
         {NAV_ITEMS.map((item) => {
-          const active = location.pathname === item.path;
+          // Dashboard path is role-specific
+          const resolvedPath = item.isDashboard ? getDashboardPath(user) : item.path;
+          const active = item.isDashboard
+            ? location.pathname.startsWith('/dashboard')
+            : location.pathname === item.path;
           return (
             <Link
-              key={item.path}
-              to={item.path}
+              key={item.label}
+              to={resolvedPath}
               className={`sidebar__item ${active ? 'sidebar__item--active' : ''}`}
               onClick={() => setMobileOpen(false)}
             >

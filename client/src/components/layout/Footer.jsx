@@ -1,42 +1,50 @@
+import { Link } from 'react-router-dom';
 import './Footer.css';
 
-const Footer = () => {
-  return (
-    <footer className="footer">
-      <div className="container">
-        <div className="footer-content">
-          <div className="footer-section">
-            <h3>Kirana</h3>
-            <p>Smart inventory management for general stores</p>
-          </div>
-          
-          <div className="footer-section">
-            <h4>Quick Links</h4>
-            <ul>
-              <li><a href="#features">Features</a></li>
-              <li><a href="#how-it-works">How It Works</a></li>
-              <li><a href="/login">Login</a></li>
-              <li><a href="/signup">Sign Up</a></li>
-            </ul>
-          </div>
-          
-          <div className="footer-section">
-            <h4>Support</h4>
-            <ul>
-              <li><a href="#help">Help Center</a></li>
-              <li><a href="#contact">Contact Us</a></li>
-              <li><a href="#privacy">Privacy Policy</a></li>
-              <li><a href="#terms">Terms of Service</a></li>
-            </ul>
-          </div>
-        </div>
-        
-        <div className="footer-bottom">
-          <p>&copy; 2024 Kirana. All rights reserved.</p>
-        </div>
+const Footer = () => (
+  <footer className="footer">
+    <div className="container footer__inner">
+      {/* Brand */}
+      <div className="footer__brand">
+        <Link to="/" className="footer__logo">
+          <span>📦</span>
+          <span className="footer__logo-text">DukaanSetu</span>
+        </Link>
+        <p className="footer__tagline">
+          Smart inventory management for modern Indian businesses.
+        </p>
       </div>
-    </footer>
-  );
-};
+
+      {/* Links */}
+      <div className="footer__col">
+        <p className="footer__col-title">Product</p>
+        <a href="#features"    className="footer__link">Features</a>
+        <a href="#how-it-works" className="footer__link">How it works</a>
+        <a href="#roles"       className="footer__link">Roles</a>
+      </div>
+
+      <div className="footer__col">
+        <p className="footer__col-title">Account</p>
+        <Link to="/login"  className="footer__link">Sign In</Link>
+        <Link to="/signup" className="footer__link">Get Started</Link>
+        <Link to="/dashboard" className="footer__link">Dashboard</Link>
+      </div>
+
+      <div className="footer__col">
+        <p className="footer__col-title">Support</p>
+        <a href="#help"    className="footer__link">Help Center</a>
+        <a href="#privacy" className="footer__link">Privacy Policy</a>
+        <a href="#terms"   className="footer__link">Terms of Service</a>
+      </div>
+    </div>
+
+    <div className="footer__bottom">
+      <div className="container footer__bottom-inner">
+        <p>© {new Date().getFullYear()} DukaanSetu. All rights reserved.</p>
+        <p>Built with ❤️ for Indian businesses</p>
+      </div>
+    </div>
+  </footer>
+);
 
 export default Footer;

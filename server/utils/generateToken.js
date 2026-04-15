@@ -1,20 +1,21 @@
 const jwt = require('jsonwebtoken');
 
 /**
- * Generate JWT access token
- * @param {string} userId - User ID
- * @returns {string} JWT token
+ * Generate JWT access token — embeds userId + role
+ * @param {string} userId
+ * @param {string} role
  */
-const generateAccessToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m',
-  });
+const generateAccessToken = (userId, role = 'shop_owner') => {
+  return jwt.sign(
+    { id: userId, role },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m' }
+  );
 };
 
 /**
  * Generate JWT refresh token
- * @param {string} userId - User ID
- * @returns {string} JWT refresh token
+ * @param {string} userId
  */
 const generateRefreshToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_REFRESH_SECRET, {

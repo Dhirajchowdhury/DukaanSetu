@@ -78,16 +78,15 @@ const verifyEmail = async (req, res, next) => {
 
     otpStore.delete(email);
 
-    // Generate tokens
-    const accessToken = generateAccessToken(user._id);
+    // Generate tokens — embed role in access token
+    const accessToken = generateAccessToken(user._id, user.role);
     const refreshToken = generateRefreshToken(user._id);
 
-    // Set refresh token in httpOnly cookie
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.json({
@@ -127,11 +126,10 @@ const login = async (req, res, next) => {
       return res.status(403).json({ message: 'Please verify your email first' });
     }
 
-    // Generate tokens
-    const accessToken = generateAccessToken(user._id);
+    // Generate tokens — embed role in access token
+    const accessToken = generateAccessToken(user._id, user.role);
     const refreshToken = generateRefreshToken(user._id);
 
-    // Set refresh token in httpOnly cookie
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -165,9 +163,11 @@ const refresh = async (req, res, next) => {
     // Verify refresh token
     const decoded = verifyRefreshToken(refreshToken);
 
-    // Generate new access token
-    const accessToken = generateAccessToken(decoded.id);
+    // Re-fetch user to get current role
+    const user = await User.findById(decoded.id).select('role');
+    if (!user) return res.status(401).json({ message: 'User not found' });
 
+    const accessToken = generateAccessToken(user._id, user.role);
     res.json({ accessToken });
   } catch (error) {
     res.status(401).json({ message: 'Invalid refresh token' });

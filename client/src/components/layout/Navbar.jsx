@@ -1,120 +1,97 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { FaBars, FaTimes } from 'react-icons/fa';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth, getDashboardPath } from '../../context/AuthContext';
+import { FiMenu, FiX, FiLogOut } from 'react-icons/fi';
 import './Navbar.css';
 
 const Navbar = () => {
   const { isAuthenticated, logout } = useAuth();
   const location = useLocation();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
 
   const isActive = (path) => location.pathname === path;
+  const close = () => setOpen(false);
 
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+    close();
   };
 
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false);
-  };
+  // Determine if we're on the dark hero (landing page)
+  const isDark = location.pathname === '/';
 
   return (
-    <nav className="navbar">
-      <div className="navbar-container">
-        <Link to="/" className="navbar-logo" onClick={closeMobileMenu}>
-          <span className="logo-icon">📦</span>
-          <span className="logo-text">DukaanSetu</span>
+    <nav className={`navbar ${isDark ? 'navbar--dark' : 'navbar--light'}`}>
+      <div className="navbar__inner">
+        {/* Logo */}
+        <Link to="/" className="navbar__logo" onClick={close}>
+          <span className="navbar__logo-icon">📦</span>
+          <span className="navbar__logo-text">DukaanSetu</span>
         </Link>
-        
-        {/* Desktop Navigation */}
-        <div className={`nav-menu ${mobileMenuOpen ? 'active' : ''}`}>
+
+        {/* Desktop links */}
+        <div className="navbar__links">
           {!isAuthenticated ? (
             <>
-              <Link 
-                to="/" 
-                className={`nav-link ${isActive('/') ? 'active' : ''}`}
-                onClick={closeMobileMenu}
-              >
-                Home
-              </Link>
-              <a 
-                href="#features" 
-                className="nav-link"
-                onClick={closeMobileMenu}
-              >
-                Features
-              </a>
-              <a 
-                href="#how-it-works" 
-                className="nav-link"
-                onClick={closeMobileMenu}
-              >
-                How It Works
-              </a>
-              <Link 
-                to="/login" 
-                className={`nav-link ${isActive('/login') ? 'active' : ''}`}
-                onClick={closeMobileMenu}
-              >
-                Login
-              </Link>
-              <Link 
-                to="/signup" 
-                className="nav-btn"
-                onClick={closeMobileMenu}
-              >
-                Get Started
-              </Link>
+              <a href="#features" className="navbar__link">Features</a>
+              <a href="#how-it-works" className="navbar__link">How it works</a>
+              <a href="#roles" className="navbar__link">Roles</a>
+              <Link to="/login" className="navbar__link">Sign In</Link>
+              <Link to="/signup" className="btn btn-primary btn-sm">Get Started</Link>
             </>
           ) : (
             <>
-              <Link 
-                to="/dashboard" 
-                className={`nav-link ${isActive('/dashboard') ? 'active' : ''}`}
-                onClick={closeMobileMenu}
-              >
-                Dashboard
-              </Link>
-              <Link 
-                to="/products" 
-                className={`nav-link ${isActive('/products') ? 'active' : ''}`}
-                onClick={closeMobileMenu}
-              >
-                Products
-              </Link>
-              <Link 
-                to="/categories" 
-                className={`nav-link ${isActive('/categories') ? 'active' : ''}`}
-                onClick={closeMobileMenu}
-              >
-                Categories
-              </Link>
-              <Link 
-                to="/reports" 
-                className={`nav-link ${isActive('/reports') ? 'active' : ''}`}
-                onClick={closeMobileMenu}
-              >
-                Reports
-              </Link>
-              <button 
-                onClick={() => {
-                  logout();
-                  closeMobileMenu();
-                }} 
-                className="nav-btn logout-btn"
-              >
-                Logout...
+              <Link to={getDashboardPath(user)} className={`navbar__link ${location.pathname.startsWith('/dashboard') ? 'navbar__link--active' : ''}`}>Dashboard</Link>
+              <Link to="/products"   className={`navbar__link ${isActive('/products')   ? 'navbar__link--active' : ''}`}>Products</Link>
+              <Link to="/categories" className={`navbar__link ${isActive('/categories') ? 'navbar__link--active' : ''}`}>Categories</Link>
+              <Link to="/reports"    className={`navbar__link ${isActive('/reports')    ? 'navbar__link--active' : ''}`}>Reports</Link>
+              <button className="btn btn-ghost btn-sm navbar__logout" onClick={handleLogout}>
+                <FiLogOut /> Logout
               </button>
             </>
           )}
         </div>
 
-        {/* Mobile Menu Toggle */}
-        <div className="mobile-menu-icon" onClick={toggleMobileMenu}>
-          {mobileMenuOpen ? <FaTimes /> : <FaBars />}
-        </div>
+        {/* Mobile toggle */}
+        <button
+          className="navbar__toggle"
+          onClick={() => setOpen(o => !o)}
+          aria-label="Toggle menu"
+        >
+          {open ? <FiX /> : <FiMenu />}
+        </button>
       </div>
+
+      {/* Mobile drawer */}
+      {open && (
+        <>
+          <div className="navbar__overlay" onClick={close} />
+          <div className="navbar__drawer">
+            {!isAuthenticated ? (
+              <>
+                <a href="#features"    className="navbar__drawer-link" onClick={close}>Features</a>
+                <a href="#how-it-works" className="navbar__drawer-link" onClick={close}>How it works</a>
+                <a href="#roles"       className="navbar__drawer-link" onClick={close}>Roles</a>
+                <Link to="/login"      className="navbar__drawer-link" onClick={close}>Sign In</Link>
+                <Link to="/signup"     className="btn btn-primary btn-block" onClick={close}>Get Started</Link>
+              </>
+            ) : (
+              <>
+                <Link to={getDashboardPath(user)} className="navbar__drawer-link" onClick={close}>Dashboard</Link>
+                <Link to="/products"   className="navbar__drawer-link" onClick={close}>Products</Link>
+                <Link to="/categories" className="navbar__drawer-link" onClick={close}>Categories</Link>
+                <Link to="/reports"    className="navbar__drawer-link" onClick={close}>Reports</Link>
+                <Link to="/settings"   className="navbar__drawer-link" onClick={close}>Settings</Link>
+                <button className="btn btn-danger btn-block" onClick={handleLogout}>
+                  <FiLogOut /> Logout
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </nav>
   );
 };

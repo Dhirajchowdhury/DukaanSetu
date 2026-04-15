@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, getDashboardPath } from '../context/AuthContext';
 import { FiMail, FiLock, FiUser, FiPhone, FiEye, FiEyeOff } from 'react-icons/fi';
 import { FaGoogle } from 'react-icons/fa';
 import './Auth.css';
@@ -42,8 +42,8 @@ const Signup = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await verifyEmail(form.email, otp);
-      navigate('/dashboard');
+      const { user } = await verifyEmail(form.email, otp);
+      navigate(getDashboardPath(user), { replace: true });
     } catch {
       // toast handled
     } finally {
