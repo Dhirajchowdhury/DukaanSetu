@@ -12,7 +12,7 @@ const otpStore = new Map();
  */
 const signup = async (req, res, next) => {
   try {
-    const { email, password, shopName, phoneNumber } = req.body;
+    const { email, password, shopName, phoneNumber, role } = req.body;
 
     // Check if user exists
     const existingUser = await User.findOne({ email });
@@ -26,6 +26,7 @@ const signup = async (req, res, next) => {
       password,
       shopName,
       phoneNumber,
+      role: role || 'shop_owner',
     });
 
     // Generate OTP
@@ -192,6 +193,47 @@ const getMe = async (req, res) => {
   res.json({ user: req.user });
 };
 
+/**
+ * @desc    Update user profile
+ * @route   PUT /api/auth/profile
+ * @access  Private
+ */
+const updateProfile = async (req, res, next) => {
+  try {
+    const { shopName, phoneNumber, preferences } = req.body;
+    const updates = {};
+    if (shopName) updates.shopName = shopName;
+    if (phoneNumber) updates.phoneNumber = phoneNumber;
+    if (preferences) updates.preferences = { ...req.user.preferences, ...preferences };
+
+    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true });
+    res.json({ message: 'Profile updated', user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Change password
+ * @route   PUT /api/auth/change-password
+ * @access  Private
+ */
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user._id).select('+password');
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) return res.status(400).json({ message: 'Current password is incorrect' });
+
+    user.password = newPassword;
+    await user.save();
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   signup,
   verifyEmail,
@@ -199,4 +241,6 @@ module.exports = {
   refresh,
   logout,
   getMe,
+  updateProfile,
+  changePassword,
 };

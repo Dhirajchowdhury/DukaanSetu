@@ -104,6 +104,18 @@ export const ProductProvider = ({ children }) => {
     }
   };
 
+  const adjustStock = async (id, adjustment, reason = '') => {
+    try {
+      const { data } = await api.patch(`/products/${id}/stock`, { adjustment, reason });
+      toast.success(`Stock adjusted by ${adjustment > 0 ? '+' : ''}${adjustment}`);
+      fetchStats();
+      return data.product;
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Stock adjustment failed');
+      throw error;
+    }
+  };
+
   const value = {
     products,
     categories,
@@ -116,6 +128,7 @@ export const ProductProvider = ({ children }) => {
     updateProduct,
     deleteProduct,
     lookupBarcode,
+    adjustStock,
   };
 
   return <ProductContext.Provider value={value}>{children}</ProductContext.Provider>;

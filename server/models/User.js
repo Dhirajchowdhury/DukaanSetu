@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
+const ROLES = ['shop_owner', 'distributor', 'wholesaler', 'producer'];
+
+const ROLES = ['shop_owner', 'distributor', 'wholesaler', 'producer'];
+
 const userSchema = new mongoose.Schema({
   email: {
     type: String,
@@ -12,12 +16,17 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: function() {
-      return !this.googleId; // Password required only for local auth
+      return !this.googleId;
     },
   },
   googleId: {
     type: String,
     sparse: true,
+  },
+  role: {
+    type: String,
+    enum: ROLES,
+    default: 'shop_owner',
   },
   shopName: {
     type: String,
@@ -26,7 +35,7 @@ const userSchema = new mongoose.Schema({
   phoneNumber: {
     type: String,
     required: function() {
-      return !this.googleId; // Phone required for local signup
+      return !this.googleId;
     },
   },
   emailVerified: {

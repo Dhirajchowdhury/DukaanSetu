@@ -12,21 +12,27 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchStats();
-    fetchProducts({ limit: 10 });
+    fetchProducts({ limit: 8 });
   }, []);
+
+  const greeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
 
   return (
     <div className="dashboard-layout">
       <Sidebar />
       <main className="dashboard-main">
-        <div className="dashboard-header">
-          <h1>Your inventory details, {user?.shopName}!</h1>
-          <p>Here's what's happening with your inventory today</p>
-          <p>List of items WIll be appeared here </p>
+        <div className="page-header">
+          <h1>{greeting()}, {user?.shopName} 👋</h1>
+          <p>Here's what's happening with your inventory today.</p>
         </div>
 
         <StatsCards stats={stats} />
-        <ProductTable />
+        <ProductTable compact />
       </main>
     </div>
   );

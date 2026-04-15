@@ -1,46 +1,51 @@
-import { FaBox, FaExclamationTriangle, FaClock, FaDollarSign } from 'react-icons/fa';
+import { FiPackage, FiAlertTriangle, FiClock, FiTrendingUp } from 'react-icons/fi';
 import './StatsCards.css';
 
 const StatsCards = ({ stats }) => {
-  if (!stats) {
-    return <div className="stats-loading">Loading stats...</div>;
-  }
-
   const cards = [
     {
-      icon: <FaBox />,
-      label: 'Total Items',
-      value: stats.totalItems || 0,
+      icon: <FiPackage />,
+      label: 'Total Products',
+      value: stats?.totalItems ?? '—',
+      sub: 'items in inventory',
       color: 'primary',
     },
     {
-      icon: <FaExclamationTriangle />,
+      icon: <FiAlertTriangle />,
       label: 'Low Stock',
-      value: stats.lowStockCount || 0,
+      value: stats?.lowStockCount ?? '—',
+      sub: 'need restocking',
       color: 'warning',
     },
     {
-      icon: <FaClock />,
+      icon: <FiClock />,
       label: 'Expiring Soon',
-      value: stats.expiringSoonCount || 0,
-      color: 'error',
+      value: stats?.expiringSoonCount ?? '—',
+      sub: 'within 7 days',
+      color: 'danger',
     },
     {
-      icon: <FaDollarSign />,
-      label: 'Total Value',
-      value: `$${(stats.totalValue || 0).toFixed(2)}`,
+      icon: <FiTrendingUp />,
+      label: 'Inventory Value',
+      value: stats ? `₹${(stats.totalValue || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '—',
+      sub: 'total stock value',
       color: 'success',
     },
   ];
 
   return (
-    <div className="stats-cards">
-      {cards.map((card, index) => (
-        <div key={index} className={`stat-card card stat-${card.color}`}>
-          <div className="stat-icon">{card.icon}</div>
-          <div className="stat-content">
-            <div className="stat-value">{card.value}</div>
-            <div className="stat-label">{card.label}</div>
+    <div className="stats-grid">
+      {cards.map((card, i) => (
+        <div key={i} className={`stat-card stat-card--${card.color}`}>
+          <div className="stat-card__icon-wrap">
+            {card.icon}
+          </div>
+          <div className="stat-card__body">
+            <p className="stat-card__label">{card.label}</p>
+            <p className="stat-card__value">
+              {stats === null ? <span className="spinner" /> : card.value}
+            </p>
+            <p className="stat-card__sub">{card.sub}</p>
           </div>
         </div>
       ))}

@@ -1,0 +1,54 @@
+.cat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.cat-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 16px;
+  transition: box-shadow var(--transition), transform var(--transition);
+}
+.cat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+
+.cat-card__icon { font-size: 2rem; flex-shrink: 0; }
+.cat-card__body { flex: 1; min-width: 0; }
+.cat-card__name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cat-card__actions { display: flex; gap: 6px; }
+
+/* Emoji picker */
+.cat-emoji-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.cat-emoji-btn {
+  width: 40px; height: 40px;
+  border-radius: var(--radius-md);
+  font-size: 1.3rem;
+  background: var(--surface-2);
+  border: 2px solid transparent;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cat-emoji-btn:hover { background: var(--primary-light); border-color: var(--primary-muted); }
+.cat-emoji-btn--active { border-color: var(--primary); background: var(--primary-light); }
+
+/* reuse from ProductTable */
+.pt-btn-edit { background: var(--primary-light); color: var(--primary); }
+.pt-btn-edit:hover { background: var(--primary); color: #fff; }
+.pt-btn-delete { background: var(--danger-light); color: var(--danger); }
+.pt-btn-delete:hover { background: var(--danger); color: #fff; }

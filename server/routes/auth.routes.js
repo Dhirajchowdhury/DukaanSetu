@@ -7,6 +7,8 @@ const {
   refresh,
   logout,
   getMe,
+  updateProfile,
+  changePassword,
 } = require('../controllers/auth.controller');
 const { protect } = require('../middleware/auth.middleware');
 const {
@@ -25,6 +27,8 @@ router.post('/login', loginValidation, validate, login);
 router.post('/refresh', refresh);
 router.post('/logout', protect, logout);
 router.get('/me', protect, getMe);
+router.put('/profile', protect, updateProfile);
+router.put('/change-password', protect, changePassword);
 
 // Google OAuth routes
 router.get('/google',
@@ -34,11 +38,9 @@ router.get('/google',
 router.get('/google/callback',
   passport.authenticate('google', { session: false, failureRedirect: '/login' }),
   (req, res) => {
-    // Generate tokens
     const accessToken = generateAccessToken(req.user._id);
     const refreshToken = generateRefreshToken(req.user._id);
 
-    // Set refresh token in cookie
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -46,7 +48,6 @@ router.get('/google/callback',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    // Redirect to frontend with access token
     res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${accessToken}`);
   }
 );

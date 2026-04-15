@@ -1,4 +1,5 @@
 import Sidebar from '../components/layout/Sidebar';
+import ProductTable from '../components/dashboard/ProductTable';
 import './Dashboard.css';
 
 const Products = () => {
@@ -6,13 +7,11 @@ const Products = () => {
     <div className="dashboard-layout">
       <Sidebar />
       <main className="dashboard-main">
-        <div className="dashboard-header">
+        <div className="page-header">
           <h1>Products</h1>
-          <p>Manage your inventory products</p>
+          <p>Manage your entire inventory in one place.</p>
         </div>
-        <div className="card">
-          <p>Full product management interface coming soon...</p>
-        </div>
+        <ProductTable />
       </main>
     </div>
   );

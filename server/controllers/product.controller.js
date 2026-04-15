@@ -244,6 +244,35 @@ const getStats = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Manual stock correction
+ * @route   PATCH /api/products/:id/stock
+ * @access  Private
+ */
+const adjustStock = async (req, res, next) => {
+  try {
+    const { adjustment, reason } = req.body; // adjustment: +/- number
+    if (typeof adjustment !== 'number') {
+      return res.status(400).json({ message: 'adjustment must be a number' });
+    }
+
+    const product = await Product.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+
+    const newQty = product.quantity + adjustment;
+    if (newQty < 0) return res.status(400).json({ message: 'Stock cannot go below 0' });
+
+    product.quantity = newQty;
+    if (adjustment > 0) product.lastRestockDate = new Date();
+    await product.save();
+    await product.populate('categoryId', 'name icon');
+
+    res.json({ message: 'Stock adjusted', product, adjustment, reason });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getProducts,
   getProduct,
@@ -251,4 +280,5 @@ module.exports = {
   updateProduct,
   deleteProduct,
   getStats,
+  adjustStock,
 };

@@ -20,23 +20,21 @@ function App() {
           <Toaster
             position="top-right"
             toastOptions={{
-              duration: 3000,
+              duration: 3500,
               style: {
-                background: '#FFFFF0',
-                color: '#2D3748',
-                borderRadius: '8px',
+                background: '#fff',
+                color: '#0F172A',
+                borderRadius: '10px',
+                border: '1px solid #E2E8F0',
+                boxShadow: '0 4px 12px rgba(0,0,0,.1)',
+                fontSize: '14px',
+                fontWeight: '500',
               },
               success: {
-                iconTheme: {
-                  primary: '#8AA624',
-                  secondary: '#fff',
-                },
+                iconTheme: { primary: '#22C55E', secondary: '#fff' },
               },
               error: {
-                iconTheme: {
-                  primary: '#DC2626',
-                  secondary: '#fff',
-                },
+                iconTheme: { primary: '#EF4444', secondary: '#fff' },
               },
             }}
           />
