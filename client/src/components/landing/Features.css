@@ -1,0 +1,210 @@
+.features-section {
+  padding: 80px 5%;
+  background: #ffffff;
+  position: relative;
+}
+
+.features-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+.section-title {
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
+  font-weight: 700;
+  color: #000000;
+  margin-bottom: 1rem;
+  line-height: 1.2;
+}
+
+.highlight {
+  color: #6B8519;
+  position: relative;
+  font-weight: 700;
+}
+
+.section-subtitle {
+  font-size: 1.2rem;
+  color: #2D3748;
+  max-width: 600px;
+  margin: 0 auto;
+  font-weight: 500;
+}
+
+/* BENTO BOX GRID */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 280px;
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.feature-card {
+  position: relative;
+  border-radius: 24px;
+  background: white;
+  padding: 40px;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+/* Grid sizes */
+.feature-large {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+.feature-wide {
+  grid-column: span 2;
+  grid-row: span 1;
+}
+
+.feature-small {
+  grid-column: span 1;
+  grid-row: span 1;
+}
+
+/* Blob background */
+.blob-container {
+  position: absolute;
+  top: -30%;
+  right: -30%;
+  width: 160%;
+  height: 160%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+/* Card content */
+.card-content {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.icon {
+  font-size: 5rem;
+  margin-bottom: 1.5rem;
+  will-change: transform;
+  line-height: 1;
+}
+
+.feature-card h3 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  color: #000000;
+  line-height: 1.2;
+}
+
+.feature-card p {
+  font-size: 1.05rem;
+  color: #2D3748;
+  line-height: 1.6;
+}
+
+/* Large card specific styles */
+.feature-large .icon {
+  font-size: 6rem;
+}
+
+.feature-large h3 {
+  font-size: 2.2rem;
+}
+
+.feature-large p {
+  font-size: 1.15rem;
+}
+
+/* RESPONSIVE DESIGN */
+@media (max-width: 1200px) {
+  .bento-grid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: 260px;
+  }
+
+  .feature-large {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+
+  .feature-wide {
+    grid-column: span 2;
+  }
+
+  .feature-small {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .features-section {
+    padding: 60px 5%;
+  }
+
+  .section-header {
+    margin-bottom: 40px;
+  }
+
+  .bento-grid {
+    grid-template-columns: 1fr;
+    grid-auto-rows: 280px;
+    gap: 20px;
+  }
+
+  .feature-large,
+  .feature-wide,
+  .feature-small {
+    grid-column: span 1;
+    grid-row: span 1;
+  }
+
+  .feature-card {
+    padding: 30px;
+  }
+
+  .icon {
+    font-size: 4rem;
+  }
+
+  .feature-card h3 {
+    font-size: 1.5rem;
+  }
+
+  .feature-card p {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .bento-grid {
+    grid-auto-rows: 280px;
+  }
+
+  .feature-card {
+    padding: 25px;
+  }
+
+  .icon {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .feature-card h3 {
+    font-size: 1.3rem;
+  }
+}

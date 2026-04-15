@@ -1,0 +1,961 @@
+/* ===================================
+   LANDING PAGE - BENTO GRID DESIGN
+   =================================== */
+
+.landing {
+  position: relative;
+  overflow-x: hidden;
+  background: #F7F4EA;
+}
+
+/* ===================================
+   HERO BENTO SECTION
+   =================================== */
+
+.hero-bento-section {
+  min-height: 100vh;
+  padding: 120px 5% 80px;
+  background: linear-gradient(135deg, #F7F4EA 0%, #FFFFF0 100%);
+  position: relative;
+}
+
+.hero-bento-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(138, 166, 36, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.hero-bento-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Hero Header */
+.hero-header {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.hero-title {
+  font-size: clamp(2.5rem, 7vw, 5rem);
+  font-weight: 800;
+  line-height: 1.1;
+  margin-bottom: 1.5rem;
+  color: #1a1a1a;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #8AA624 0%, #6B8519 50%, #FEA405 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: inline-block;
+}
+
+.hero-subtitle {
+  font-size: clamp(1.1rem, 2vw, 1.3rem);
+  color: #424242;
+  max-width: 600px;
+  margin: 0 auto 2.5rem;
+  line-height: 1.6;
+}
+
+.hero-cta {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-primary {
+  padding: 16px 32px;
+  background: linear-gradient(135deg, #8AA624 0%, #6B8519 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(138, 166, 36, 0.3);
+  text-decoration: none;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(138, 166, 36, 0.4);
+}
+
+.btn-secondary {
+  padding: 16px 32px;
+  background: white;
+  color: #8AA624;
+  border: 2px solid #8AA624;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-secondary:hover {
+  background: #8AA624;
+  color: white;
+  transform: translateY(-2px);
+}
+
+/* ===================================
+   BENTO GRID
+   =================================== */
+
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 20px;
+  margin-top: 60px;
+}
+
+.bento-box {
+  background: white;
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.bento-box:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+
+.bento-box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #8AA624, #FEA405);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.bento-box:hover::before {
+  opacity: 1;
+}
+
+/* Grid Sizes */
+.bento-large {
+  grid-column: span 7;
+  grid-row: span 2;
+}
+
+.bento-medium {
+  grid-column: span 5;
+  grid-row: span 2;
+}
+
+.bento-small {
+  grid-column: span 4;
+}
+
+.bento-wide {
+  grid-column: span 8;
+}
+
+/* Bento Content */
+.bento-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.bento-content h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 0.75rem;
+}
+
+.bento-content p {
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.bento-icon-badge {
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, #8AA624 0%, #6B8519 100%);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 12px rgba(138, 166, 36, 0.3);
+}
+
+.bento-icon-badge.large {
+  width: 72px;
+  height: 72px;
+  font-size: 2rem;
+}
+
+/* ===================================
+   BARCODE SCANNER BOX
+   =================================== */
+
+.bento-scanner {
+  background: linear-gradient(135deg, #f0f7e6 0%, #e8f5e0 100%);
+}
+
+.scanner-visual {
+  margin-top: auto;
+  position: relative;
+  height: 180px;
+  background: white;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.scanner-line {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #8AA624, transparent);
+  animation: scan 2s ease-in-out infinite;
+  box-shadow: 0 0 10px #8AA624;
+}
+
+@keyframes scan {
+  0%, 100% { top: 20%; opacity: 0; }
+  50% { top: 80%; opacity: 1; }
+}
+
+.barcode-demo {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  height: 80px;
+}
+
+.barcode-line {
+  width: 4px;
+  height: 100%;
+  background: #1a1a1a;
+  border-radius: 2px;
+}
+
+.barcode-line.short {
+  height: 60%;
+}
+
+/* ===================================
+   STATS BOX
+   =================================== */
+
+.bento-stats {
+  background: linear-gradient(135deg, #fff9e6 0%, #fff5d6 100%);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #FEA405;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 0.25rem;
+}
+
+.mini-chart {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  height: 60px;
+  margin-top: auto;
+}
+
+.chart-bar {
+  flex: 1;
+  background: linear-gradient(180deg, #FEA405 0%, #E59400 100%);
+  border-radius: 4px 4px 0 0;
+  animation: chartGrow 1.5s ease-out;
+}
+
+@keyframes chartGrow {
+  from { height: 0; }
+}
+
+/* ===================================
+   NOTIFICATIONS BOX
+   =================================== */
+
+.bento-notifications {
+  background: linear-gradient(135deg, #fff0f0 0%, #ffe8e8 100%);
+}
+
+.notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: auto;
+}
+
+.notification-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  color: #333;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.notif-icon {
+  color: #FEA405;
+  font-size: 1.2rem;
+}
+
+/* ===================================
+   MOBILE BOX
+   =================================== */
+
+.bento-mobile {
+  background: linear-gradient(135deg, #e8f0ff 0%, #d6e4ff 100%);
+}
+
+.mobile-mockup {
+  margin-top: auto;
+  display: flex;
+  justify-content: center;
+}
+
+.phone-frame {
+  width: 140px;
+  height: 280px;
+  background: #1a1a1a;
+  border-radius: 24px;
+  padding: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.phone-screen {
+  width: 100%;
+  height: 100%;
+  background: white;
+  border-radius: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.phone-notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 20px;
+  background: #1a1a1a;
+  border-radius: 0 0 12px 12px;
+}
+
+.phone-content {
+  padding: 32px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.phone-bar {
+  height: 12px;
+  background: linear-gradient(90deg, #8AA624, #6B8519);
+  border-radius: 6px;
+  animation: phoneLoad 2s ease-in-out infinite;
+}
+
+.phone-bar.short {
+  width: 60%;
+}
+
+@keyframes phoneLoad {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+/* ===================================
+   FEATURES LIST BOX
+   =================================== */
+
+.bento-features {
+  background: linear-gradient(135deg, #f5f0ff 0%, #ebe0ff 100%);
+}
+
+.features-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 1rem;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.95rem;
+  color: #333;
+}
+
+.feature-item svg {
+  color: #8AA624;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+/* ===================================
+   ACTION BOX
+   =================================== */
+
+.bento-action {
+  background: linear-gradient(135deg, #8AA624 0%, #6B8519 100%);
+  color: white;
+}
+
+.bento-action .bento-content h3,
+.bento-action .bento-content p {
+  color: white;
+}
+
+.bento-action .bento-icon-badge {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.btn-bento {
+  margin-top: auto;
+  padding: 14px 28px;
+  background: white;
+  color: #8AA624;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  transition: all 0.3s;
+  text-decoration: none;
+}
+
+.btn-bento:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* ===================================
+   TEAM COLLABORATION BOX
+   =================================== */
+
+.bento-team {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+}
+
+.team-avatars {
+  display: flex;
+  gap: -8px;
+  margin-top: auto;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  border: 3px solid #e0f2fe;
+  margin-left: -8px;
+}
+
+.avatar:first-child {
+  margin-left: 0;
+}
+
+.avatar.plus {
+  background: linear-gradient(135deg, #8AA624, #6B8519);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+/* ===================================
+   CLOUD SYNC BOX
+   =================================== */
+
+.bento-cloud {
+  background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+}
+
+.sync-indicator {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: auto;
+  padding: 20px 0;
+}
+
+.sync-circle {
+  width: 12px;
+  height: 12px;
+  background: #8AA624;
+  border-radius: 50%;
+  animation: syncPulse 1.5s ease-in-out infinite;
+}
+
+.sync-circle:nth-child(2) {
+  animation-delay: 0.3s;
+}
+
+.sync-circle:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+@keyframes syncPulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.5); opacity: 1; }
+}
+
+/* ===================================
+   SECURITY BOX
+   =================================== */
+
+.bento-security {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+}
+
+.security-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.security-badge {
+  padding: 8px 16px;
+  background: white;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #333;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* ===================================
+   PERFORMANCE BOX
+   =================================== */
+
+.bento-performance {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+}
+
+.speed-meter {
+  margin-top: auto;
+}
+
+.speed-bar {
+  height: 8px;
+  background: linear-gradient(90deg, #DC2626 0%, #FEA405 50%, #8AA624 100%);
+  border-radius: 4px;
+  margin-bottom: 12px;
+  animation: speedLoad 2s ease-in-out infinite;
+}
+
+@keyframes speedLoad {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+
+.speed-label {
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #DC2626;
+}
+
+/* ===================================
+   CATEGORIES BOX
+   =================================== */
+
+.bento-categories {
+  background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
+}
+
+.category-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.tag {
+  padding: 8px 12px;
+  background: white;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #333;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* ===================================
+   REPORTS BOX
+   =================================== */
+
+.bento-reports {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+}
+
+.report-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 1rem;
+}
+
+.report-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: white;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.report-status {
+  padding: 4px 12px;
+  background: #8AA624;
+  color: white;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* ===================================
+   SOCIAL PROOF SECTION
+   =================================== */
+
+.social-proof-section {
+  padding: 60px 5%;
+  background: white;
+}
+
+.social-proof-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.social-proof-text {
+  font-size: 1.1rem;
+  color: #666;
+  margin-bottom: 2rem;
+}
+
+.trust-badges {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.trust-badge {
+  padding: 12px 24px;
+  background: #F7F4EA;
+  border-radius: 50px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #333;
+}
+
+/* ===================================
+   HOW IT WORKS SECTION
+   =================================== */
+
+.how-it-works-section {
+  padding: 100px 5%;
+  background: linear-gradient(135deg, #F7F4EA 0%, #FFFFF0 100%);
+}
+
+.how-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.section-title {
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+  text-align: center;
+  margin-bottom: 60px;
+  color: #1a1a1a;
+}
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 30px;
+}
+
+.step-card {
+  background: white;
+  padding: 40px 30px;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s;
+  position: relative;
+}
+
+.step-card:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+
+.step-number {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #8AA624, #6B8519);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.step-icon {
+  font-size: 3rem;
+  margin-bottom: 1.5rem;
+}
+
+.step-card h3 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 0.75rem;
+}
+
+.step-card p {
+  color: #666;
+  line-height: 1.6;
+}
+
+/* ===================================
+   FINAL CTA SECTION
+   =================================== */
+
+.final-cta-section {
+  padding: 100px 5%;
+  background: linear-gradient(135deg, #8AA624 0%, #6B8519 50%, #FEA405 100%);
+  color: white;
+}
+
+.final-cta-container {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.final-cta-container h2 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+  margin-bottom: 1rem;
+}
+
+.final-cta-container p {
+  font-size: 1.3rem;
+  margin-bottom: 3rem;
+  opacity: 0.95;
+}
+
+.final-cta-buttons {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-cta-primary {
+  padding: 18px 40px;
+  background: white;
+  color: #8AA624;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.3s;
+  text-decoration: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.btn-cta-primary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+}
+
+.btn-cta-secondary {
+  padding: 18px 40px;
+  background: transparent;
+  color: white;
+  border: 2px solid white;
+  border-radius: 12px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-cta-secondary:hover {
+  background: white;
+  color: #8AA624;
+  transform: translateY(-3px);
+}
+
+/* ===================================
+   RESPONSIVE DESIGN
+   =================================== */
+
+@media (max-width: 1024px) {
+  .bento-large,
+  .bento-medium,
+  .bento-small,
+  .bento-wide {
+    grid-column: span 12;
+  }
+
+  .features-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-bento-section {
+    padding: 100px 5% 60px;
+  }
+
+  .hero-title {
+    font-size: 2.5rem;
+  }
+
+  .bento-grid {
+    gap: 16px;
+  }
+
+  .bento-box {
+    padding: 24px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+  }
+
+  .trust-badges {
+    gap: 1rem;
+  }
+
+  .steps-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .final-cta-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .btn-cta-primary,
+  .btn-cta-secondary {
+    width: 100%;
+    max-width: 300px;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-cta {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    width: 100%;
+    max-width: 280px;
+    justify-content: center;
+  }
+
+  .scanner-visual {
+    height: 140px;
+  }
+
+  .phone-frame {
+    width: 120px;
+    height: 240px;
+  }
+}

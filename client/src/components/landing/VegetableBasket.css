@@ -1,0 +1,98 @@
+.vegetable-basket {
+  position: absolute;
+  right: 5%;
+  top: 15vh;
+  width: 400px;
+  height: 400px;
+  z-index: 5;
+  will-change: transform, opacity;
+}
+
+.basket {
+  font-size: 180px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.25));
+  user-select: none;
+}
+
+.vegetable {
+  position: absolute;
+  font-size: 60px;
+  filter: drop-shadow(0 8px 15px rgba(0, 0, 0, 0.2));
+  cursor: pointer;
+  user-select: none;
+  will-change: transform;
+  transition: filter 0.3s ease;
+}
+
+.vegetable:hover {
+  filter: drop-shadow(0 12px 25px rgba(0, 0, 0, 0.3));
+}
+
+.spilling-grains {
+  position: absolute;
+  bottom: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 50px;
+}
+
+.grain-particle {
+  position: absolute;
+  width: 3px;
+  height: 7px;
+  background: #FFFFF0;
+  border-radius: 50%;
+  animation: fall 2s infinite ease-in;
+  opacity: 0;
+}
+
+@keyframes fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(60px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 1200px) {
+  .vegetable-basket {
+    width: 300px;
+    height: 300px;
+    right: 2%;
+  }
+
+  .basket {
+    font-size: 140px;
+  }
+
+  .vegetable {
+    font-size: 45px;
+  }
+}
+
+@media (max-width: 768px) {
+  .vegetable-basket {
+    position: relative;
+    width: 250px;
+    height: 250px;
+    margin: 0 auto;
+    right: auto;
+    top: 2rem;
+  }
+
+  .basket {
+    font-size: 120px;
+  }
+
+  .vegetable {
+    font-size: 40px;
+  }
+}
