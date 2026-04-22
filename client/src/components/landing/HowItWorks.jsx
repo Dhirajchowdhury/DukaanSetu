@@ -11,27 +11,27 @@ const HowItWorks = () => {
   const stepsRef = useRef([]);
 
   const steps = [
-    { 
-      number: 'Step 1', 
-      title: 'Sign Up Free', 
-      description: 'Create your account in seconds. No credit card required.',
+    {
+      number: 'Step 1',
+      title: 'Sign Up Free',
+      description: 'Create your account in minutes. No credit card required.',
       icon: '✨'
     },
-    { 
-      number: 'Step 2', 
-      title: 'Scan Products', 
+    {
+      number: 'Step 2',
+      title: 'Scan Products',
       description: 'Use your phone camera to scan barcodes and add products instantly.',
       icon: '📱'
     },
-    { 
-      number: 'Step 3', 
-      title: 'Track Inventory', 
+    {
+      number: 'Step 3',
+      title: 'Track Inventory',
       description: 'Monitor stock levels, expiry dates, and sales in real-time.',
       icon: '📊'
     },
-    { 
-      number: 'Step 4', 
-      title: 'Get Alerts', 
+    {
+      number: 'Step 4',
+      title: 'Get Alerts',
       description: 'Receive smart notifications for low stock and expiring products.',
       icon: '🔔'
     },
@@ -68,14 +68,14 @@ const HowItWorks = () => {
           start: 'top 75%',
           onEnter: () => {
             step.classList.add('active');
-            
+
             // Pulse icon animation
             const icon = step.querySelector('.step-icon');
-            gsap.fromTo(icon, 
+            gsap.fromTo(icon,
               { scale: 0.8, opacity: 0 },
-              { 
-                scale: 1, 
-                opacity: 1, 
+              {
+                scale: 1,
+                opacity: 1,
                 duration: 0.5,
                 ease: 'back.out(1.7)'
               }
@@ -94,15 +94,15 @@ const HowItWorks = () => {
     <section className="how-it-works">
       <div className="how-it-works-container">
         <h2>How It Works</h2>
-        
+
         <div className="timeline" ref={timelineRef}>
           <div className="timeline-line">
             <div ref={lineProgressRef} className="timeline-line-progress" />
           </div>
-          
+
           {steps.map((step, index) => (
-            <div 
-              key={index} 
+            <div
+              key={index}
               ref={el => stepsRef.current[index] = el}
               className="step-item"
               style={{ transform: 'translateX(-30px)' }}
