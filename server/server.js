@@ -15,6 +15,9 @@ const productRoutes = require('./routes/product.routes');
 const categoryRoutes = require('./routes/category.routes');
 const barcodeRoutes = require('./routes/barcode.routes');
 const notificationRoutes = require('./routes/notification.routes');
+const orderRoutes = require('./routes/order.routes');
+const supplierRoutes = require('./routes/supplier.routes');
+const pricingRoutes = require('./routes/pricing.routes');
 
 const app = express();
 
@@ -46,6 +49,9 @@ app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/barcode', barcodeRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/pricing', pricingRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

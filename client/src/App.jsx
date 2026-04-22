@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { ProductProvider } from './context/ProductContext';
+import { SupplierProvider } from './context/SupplierContext';
+import { OrderProvider } from './context/OrderContext';
 
 // Auth
 import PrivateRoute  from './components/auth/PrivateRoute';
@@ -16,6 +18,9 @@ import Products      from './pages/Products';
 import Categories    from './pages/Categories';
 import Reports       from './pages/Reports';
 import Settings      from './pages/Settings';
+import Suppliers     from './pages/Suppliers';
+import Orders        from './pages/Orders';
+import PlaceOrder    from './pages/PlaceOrder';
 
 // Role dashboards
 import ShopOwnerDashboard   from './pages/dashboards/ShopOwnerDashboard';
@@ -38,88 +43,103 @@ function App() {
   return (
     <AuthProvider>
       <ProductProvider>
-        <Router>
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              duration: 3500,
-              style: {
-                background: '#fff',
-                color: '#0F172A',
-                borderRadius: '10px',
-                border: '1px solid #E2E8F0',
-                boxShadow: '0 4px 12px rgba(0,0,0,.1)',
-                fontSize: '14px',
-                fontWeight: '500',
-              },
-              success: { iconTheme: { primary: '#22C55E', secondary: '#fff' } },
-              error:   { iconTheme: { primary: '#EF4444', secondary: '#fff' } },
-            }}
-          />
+        <SupplierProvider>
+          <OrderProvider>
+            <Router>
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 3500,
+                  style: {
+                    background: '#fff',
+                    color: '#0F172A',
+                    borderRadius: '10px',
+                    border: '1px solid #E2E8F0',
+                    boxShadow: '0 4px 12px rgba(0,0,0,.1)',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                  },
+                  success: { iconTheme: { primary: '#22C55E', secondary: '#fff' } },
+                  error:   { iconTheme: { primary: '#EF4444', secondary: '#fff' } },
+                }}
+              />
 
-          <Routes>
-            {/* Public */}
-            <Route path="/"             element={<Landing />} />
-            <Route path="/login"        element={<Login />} />
-            <Route path="/signup"       element={<Signup />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
+              <Routes>
+                {/* Public */}
+                <Route path="/"             element={<Landing />} />
+                <Route path="/login"        element={<Login />} />
+                <Route path="/signup"       element={<Signup />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
 
-            {/* Legacy redirect */}
-            <Route path="/dashboard" element={
-              <PrivateRoute><DashboardRedirect /></PrivateRoute>
-            } />
+                {/* Legacy redirect */}
+                <Route path="/dashboard" element={
+                  <PrivateRoute><DashboardRedirect /></PrivateRoute>
+                } />
 
-            {/* ── Role-specific dashboards ── */}
-            <Route path="/dashboard/shop-owner" element={
-              <PrivateRoute>
-                <RoleRoute roles={['shop_owner']}>
-                  <ShopOwnerDashboard />
-                </RoleRoute>
-              </PrivateRoute>
-            } />
+                {/* ── Role-specific dashboards ── */}
+                <Route path="/dashboard/shop-owner" element={
+                  <PrivateRoute>
+                    <RoleRoute roles={['shop_owner']}>
+                      <ShopOwnerDashboard />
+                    </RoleRoute>
+                  </PrivateRoute>
+                } />
 
-            <Route path="/dashboard/distributor" element={
-              <PrivateRoute>
-                <RoleRoute roles={['distributor']}>
-                  <DistributorDashboard />
-                </RoleRoute>
-              </PrivateRoute>
-            } />
+                <Route path="/dashboard/distributor" element={
+                  <PrivateRoute>
+                    <RoleRoute roles={['distributor']}>
+                      <DistributorDashboard />
+                    </RoleRoute>
+                  </PrivateRoute>
+                } />
 
-            <Route path="/dashboard/wholesaler" element={
-              <PrivateRoute>
-                <RoleRoute roles={['wholesaler']}>
-                  <WholesalerDashboard />
-                </RoleRoute>
-              </PrivateRoute>
-            } />
+                <Route path="/dashboard/wholesaler" element={
+                  <PrivateRoute>
+                    <RoleRoute roles={['wholesaler']}>
+                      <WholesalerDashboard />
+                    </RoleRoute>
+                  </PrivateRoute>
+                } />
 
-            <Route path="/dashboard/producer" element={
-              <PrivateRoute>
-                <RoleRoute roles={['producer']}>
-                  <ProducerDashboard />
-                </RoleRoute>
-              </PrivateRoute>
-            } />
+                <Route path="/dashboard/producer" element={
+                  <PrivateRoute>
+                    <RoleRoute roles={['producer']}>
+                      <ProducerDashboard />
+                    </RoleRoute>
+                  </PrivateRoute>
+                } />
 
-            {/* ── Common protected pages (all roles) ── */}
-            <Route path="/products" element={
-              <PrivateRoute><Products /></PrivateRoute>
-            } />
-            <Route path="/categories" element={
-              <PrivateRoute><Categories /></PrivateRoute>
-            } />
-            <Route path="/reports" element={
-              <PrivateRoute><Reports /></PrivateRoute>
-            } />
-            <Route path="/settings" element={
-              <PrivateRoute><Settings /></PrivateRoute>
-            } />
+                {/* ── Common protected pages (all roles) ── */}
+                <Route path="/products" element={
+                  <PrivateRoute><Products /></PrivateRoute>
+                } />
+                <Route path="/categories" element={
+                  <PrivateRoute><Categories /></PrivateRoute>
+                } />
+                <Route path="/reports" element={
+                  <PrivateRoute><Reports /></PrivateRoute>
+                } />
+                <Route path="/settings" element={
+                  <PrivateRoute><Settings /></PrivateRoute>
+                } />
+                
+                {/* Orders & Suppliers */}
+                <Route path="/suppliers" element={
+                  <PrivateRoute><Suppliers /></PrivateRoute>
+                } />
+                <Route path="/orders" element={
+                  <PrivateRoute><Orders /></PrivateRoute>
+                } />
+                <Route path="/orders/new" element={
+                  <PrivateRoute><PlaceOrder /></PrivateRoute>
+                } />
 
-            {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Router>
+                {/* Catch-all */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Router>
+          </OrderProvider>
+        </SupplierProvider>
       </ProductProvider>
     </AuthProvider>
   );
