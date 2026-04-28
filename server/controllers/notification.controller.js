@@ -1,43 +1,56 @@
-const Product = require('../models/Product');
+const { supabase } = require('../config/db');
 
 /**
- * @desc    Get user notifications (low stock + expiring products)
- * @route   GET /api/notifications
- * @access  Private
+ * @desc  Get user notifications (low stock + expiring products)
+ * @route GET /api/notifications
  */
 const getNotifications = async (req, res, next) => {
   try {
-    const userId = req.user._id;
+    const userId    = req.user.id;
+    const threshold = req.user.preferences?.lowStockThreshold ?? 10;
+    const now       = new Date().toISOString();
+    const sevenDays = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Get low stock products
-    const lowStockProducts = await Product.find({
-      userId,
-      quantity: { $lte: req.user.preferences.lowStockThreshold },
-    }).populate('categoryId', 'name icon').limit(10);
+    const [
+      { data: lowStockProducts,  error: e1 },
+      { data: expiringProducts,  error: e2 },
+    ] = await Promise.all([
+      supabase
+        .from('products')
+        .select('id, product_name, quantity, unit, updated_at, categories(name, icon)')
+        .eq('user_id', userId)
+        .lte('quantity', threshold)
+        .limit(10),
+      supabase
+        .from('products')
+        .select('id, product_name, expiry_date, updated_at, categories(name, icon)')
+        .eq('user_id', userId)
+        .gte('expiry_date', now)
+        .lte('expiry_date', sevenDays)
+        .limit(10),
+    ]);
 
-    // Get expiring products (within 7 days)
-    const sevenDaysFromNow = new Date();
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-
-    const expiringProducts = await Product.find({
-      userId,
-      expiryDate: { $gte: new Date(), $lte: sevenDaysFromNow },
-    }).populate('categoryId', 'name icon').limit(10);
+    if (e1) throw e1;
+    if (e2) throw e2;
 
     const notifications = [
-      ...lowStockProducts.map(p => ({
-        type: 'low_stock',
-        product: p,
-        message: `${p.productName} is low on stock (${p.quantity} ${p.unit} remaining)`,
-        createdAt: p.updatedAt,
+      ...(lowStockProducts || []).map(p => ({
+        type:      'low_stock',
+        productId: p.id,
+        product:   { ...p, productName: p.product_name, categoryId: p.categories },
+        message:   `${p.product_name} is low on stock (${p.quantity} ${p.unit} remaining)`,
+        createdAt: p.updated_at,
       })),
-      ...expiringProducts.map(p => {
-        const daysLeft = Math.ceil((new Date(p.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+      ...(expiringProducts || []).map(p => {
+        const daysLeft = Math.ceil(
+          (new Date(p.expiry_date) - new Date()) / (1000 * 60 * 60 * 24)
+        );
         return {
-          type: 'expiring_soon',
-          product: p,
-          message: `${p.productName} expires in ${daysLeft} days`,
-          createdAt: p.updatedAt,
+          type:      'expiring_soon',
+          productId: p.id,
+          product:   { ...p, productName: p.product_name, categoryId: p.categories },
+          message:   `${p.product_name} expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`,
+          createdAt: p.updated_at,
         };
       }),
     ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -48,6 +61,4 @@ const getNotifications = async (req, res, next) => {
   }
 };
 
-module.exports = {
-  getNotifications,
-};
+module.exports = { getNotifications };

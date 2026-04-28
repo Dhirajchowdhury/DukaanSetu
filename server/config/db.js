@@ -1,23 +1,37 @@
-const mongoose = require('mongoose');
+const { createClient } = require('@supabase/supabase-js');
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env');
+  process.exit(1);
+}
+
+/**
+ * Service-role client — bypasses Row Level Security.
+ * Used exclusively on the server; never expose this key to the client.
+ */
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-
-    // Create indexes
-    mongoose.connection.on('connected', () => {
-      console.log('📊 Creating database indexes...');
-    });
-
-  } catch (error) {
-    console.error(`❌ Error: ${error.message}`);
+    // Lightweight connectivity check
+    const { error } = await supabase.from('users').select('id').limit(1);
+    if (error && error.code !== 'PGRST116') {
+      // PGRST116 = table empty — that's fine
+      throw error;
+    }
+    console.log('✅ Supabase (PostgreSQL) connected');
+  } catch (err) {
+    console.error('❌ Supabase connection error:', err.message);
     process.exit(1);
   }
 };
 
-module.exports = connectDB;
+module.exports = { supabase, connectDB };

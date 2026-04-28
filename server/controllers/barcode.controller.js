@@ -1,11 +1,9 @@
-const Product = require('../models/Product');
-const ScanHistory = require('../models/ScanHistory');
+const { supabase } = require('../config/db');
 const { lookupBarcode } = require('../services/barcode.service');
 
 /**
- * @desc    Lookup product by barcode
- * @route   POST /api/barcode/lookup
- * @access  Private
+ * @desc  Lookup product by barcode
+ * @route POST /api/barcode/lookup
  */
 const lookupProduct = async (req, res, next) => {
   try {
@@ -15,55 +13,51 @@ const lookupProduct = async (req, res, next) => {
       return res.status(400).json({ message: 'Barcode is required' });
     }
 
-    // First check if product exists in user's inventory
-    const existingProduct = await Product.findOne({
-      userId: req.user._id,
-      barcode,
-    }).populate('categoryId', 'name icon');
+    // Check user's own inventory first
+    const { data: existing } = await supabase
+      .from('products')
+      .select('*, categories(name, icon)')
+      .eq('user_id', req.user.id)
+      .eq('barcode', barcode)
+      .maybeSingle();
 
-    if (existingProduct) {
+    if (existing) {
       return res.json({
-        found: true,
-        source: 'inventory',
-        product: existingProduct,
+        found:   true,
+        source:  'inventory',
+        product: existing,
       });
     }
 
-    // If not found, lookup from external API
+    // Fall back to external barcode API
     const apiData = await lookupBarcode(barcode);
 
     if (apiData) {
-      return res.json({
-        found: true,
-        source: 'api',
-        product: apiData,
-      });
+      return res.json({ found: true, source: 'api', product: apiData });
     }
 
-    res.json({
-      found: false,
-      message: 'Product not found. You can add it manually.',
-    });
+    res.json({ found: false, message: 'Product not found. You can add it manually.' });
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * @desc    Record barcode scan
- * @route   POST /api/barcode/scan
- * @access  Private
+ * @desc  Record a barcode scan event
+ * @route POST /api/barcode/scan
  */
 const recordScan = async (req, res, next) => {
   try {
     const { barcode, productId, action } = req.body;
 
-    await ScanHistory.create({
-      userId: req.user._id,
-      productId,
-      barcode,
-      action: action || 'view',
+    const { error } = await supabase.from('scan_history').insert({
+      user_id:    req.user.id,
+      product_id: productId || null,
+      barcode:    barcode   || null,
+      action:     action    || 'view',
     });
+
+    if (error) throw error;
 
     res.json({ message: 'Scan recorded successfully' });
   } catch (error) {
@@ -71,7 +65,4 @@ const recordScan = async (req, res, next) => {
   }
 };
 
-module.exports = {
-  lookupProduct,
-  recordScan,
-};
+module.exports = { lookupProduct, recordScan };
