@@ -68,7 +68,7 @@ DukaanSetu ("Dukaan" = Shop, "Setu" = Bridge) is a full-stack SaaS-style invento
 | Frontend   | React 18 (Vite), React Router v6, Axios         |
 | Styling    | Pure CSS with CSS custom properties (no Tailwind) |
 | Backend    | Node.js, Express.js                             |
-| Database   | MongoDB with Mongoose ODM                       |
+| Database   | Supabase (PostgreSQL)                           |
 | Auth       | JWT (jsonwebtoken), bcrypt, Passport.js (Google OAuth) |
 | Email      | Nodemailer                                      |
 | SMS        | Twilio                                          |
@@ -130,7 +130,9 @@ cd ../client && npm install
 
 **`server/.env`**
 ```env
-MONGO_URI=mongodb://localhost:27017/dukaansetu
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
 JWT_SECRET=your_jwt_secret_min_32_chars
 JWT_REFRESH_SECRET=your_refresh_secret_min_32_chars
 JWT_ACCESS_EXPIRY=15m

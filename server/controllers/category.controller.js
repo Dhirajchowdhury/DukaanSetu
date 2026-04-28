@@ -1,44 +1,70 @@
-const Category = require('../models/Category');
-const Product = require('../models/Product');
+const { supabase } = require('../config/db');
 
 /**
- * @desc    Get all categories (default + user's custom)
- * @route   GET /api/categories
- * @access  Private
+ * @desc  Get all categories (default + user's custom)
+ * @route GET /api/categories
  */
 const getCategories = async (req, res, next) => {
   try {
-    const categories = await Category.find({
-      $or: [
-        { isDefault: true },
-        { userId: req.user._id },
-      ],
-    }).sort({ isDefault: -1, name: 1 });
+    // Fetch default categories + this user's custom ones
+    const { data: categories, error } = await supabase
+      .from('categories')
+      .select('*')
+      .or(`is_default.eq.true,user_id.eq.${req.user.id}`)
+      .order('is_default', { ascending: false })
+      .order('name',       { ascending: true });
 
-    res.json({ categories });
+    if (error) throw error;
+
+    // Normalise to camelCase for frontend
+    res.json({
+      categories: categories.map(c => ({
+        _id:       c.id,
+        id:        c.id,
+        name:      c.name,
+        icon:      c.icon,
+        isDefault: c.is_default,
+        userId:    c.user_id,
+        createdAt: c.created_at,
+      })),
+    });
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * @desc    Create custom category
- * @route   POST /api/categories
- * @access  Private
+ * @desc  Create custom category
+ * @route POST /api/categories
  */
 const createCategory = async (req, res, next) => {
   try {
     const { name, icon } = req.body;
 
-    const category = await Category.create({
-      name,
-      icon: icon || '📦',
-      userId: req.user._id,
-    });
+    const { data: category, error } = await supabase
+      .from('categories')
+      .insert({
+        user_id:    req.user.id,
+        name:       name.trim(),
+        icon:       icon || '📦',
+        is_default: false,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
 
     res.status(201).json({
       message: 'Category created successfully',
-      category,
+      category: {
+        _id:       category.id,
+        id:        category.id,
+        name:      category.name,
+        icon:      category.icon,
+        isDefault: category.is_default,
+        userId:    category.user_id,
+        createdAt: category.created_at,
+      },
     });
   } catch (error) {
     next(error);
@@ -46,32 +72,53 @@ const createCategory = async (req, res, next) => {
 };
 
 /**
- * @desc    Update category
- * @route   PUT /api/categories/:id
- * @access  Private
+ * @desc  Update category
+ * @route PUT /api/categories/:id
  */
 const updateCategory = async (req, res, next) => {
   try {
-    const category = await Category.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
+    // Verify ownership and that it's not a default category
+    const { data: existing, error: fetchErr } = await supabase
+      .from('categories')
+      .select('id, is_default, user_id')
+      .eq('id', req.params.id)
+      .single();
 
-    if (!category) {
-      return res.status(404).json({ message: 'Category not found or not authorized' });
+    if (fetchErr || !existing) {
+      return res.status(404).json({ message: 'Category not found' });
     }
 
-    if (category.isDefault) {
+    if (existing.is_default) {
       return res.status(403).json({ message: 'Cannot update default categories' });
     }
 
-    category.name = req.body.name || category.name;
-    category.icon = req.body.icon || category.icon;
-    await category.save();
+    if (existing.user_id !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    const updates = {};
+    if (req.body.name) updates.name = req.body.name.trim();
+    if (req.body.icon) updates.icon = req.body.icon;
+
+    const { data: category, error } = await supabase
+      .from('categories')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error) throw error;
 
     res.json({
       message: 'Category updated successfully',
-      category,
+      category: {
+        _id:       category.id,
+        id:        category.id,
+        name:      category.name,
+        icon:      category.icon,
+        isDefault: category.is_default,
+        userId:    category.user_id,
+      },
     });
   } catch (error) {
     next(error);
@@ -79,37 +126,49 @@ const updateCategory = async (req, res, next) => {
 };
 
 /**
- * @desc    Delete category
- * @route   DELETE /api/categories/:id
- * @access  Private
+ * @desc  Delete category
+ * @route DELETE /api/categories/:id
  */
 const deleteCategory = async (req, res, next) => {
   try {
-    const category = await Category.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
+    const { data: existing, error: fetchErr } = await supabase
+      .from('categories')
+      .select('id, is_default, user_id')
+      .eq('id', req.params.id)
+      .single();
 
-    if (!category) {
-      return res.status(404).json({ message: 'Category not found or not authorized' });
+    if (fetchErr || !existing) {
+      return res.status(404).json({ message: 'Category not found' });
     }
 
-    if (category.isDefault) {
+    if (existing.is_default) {
       return res.status(403).json({ message: 'Cannot delete default categories' });
     }
 
-    // Check if any products use this category
-    const productCount = await Product.countDocuments({
-      categoryId: category._id,
-    });
+    if (existing.user_id !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
 
-    if (productCount > 0) {
+    // Check if any products reference this category
+    const { count, error: countErr } = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+      .eq('category_id', req.params.id);
+
+    if (countErr) throw countErr;
+
+    if (count > 0) {
       return res.status(400).json({
-        message: `Cannot delete category. ${productCount} products are using it.`,
+        message: `Cannot delete category. ${count} product(s) are using it.`,
       });
     }
 
-    await category.deleteOne();
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', req.params.id);
+
+    if (error) throw error;
 
     res.json({ message: 'Category deleted successfully' });
   } catch (error) {

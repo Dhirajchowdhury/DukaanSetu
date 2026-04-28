@@ -1,10 +1,8 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { supabase } = require('../config/db');
 
 /**
- * Protect — verifies JWT and attaches req.user
- * The token payload now carries { id, role } so we don't
- * need an extra DB hit just to check the role.
+ * Protect — verifies JWT and attaches req.user (from Supabase users table).
  */
 const protect = async (req, res, next) => {
   try {
@@ -20,12 +18,34 @@ const protect = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Attach full user document (minus password)
-    req.user = await User.findById(decoded.id).select('-password');
+    // Fetch user row from Supabase
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, email, shop_name, phone_number, role, email_verified, notif_email, notif_sms, low_stock_threshold, created_at')
+      .eq('id', decoded.id)
+      .single();
 
-    if (!req.user) {
+    if (error || !user) {
       return res.status(401).json({ message: 'User not found' });
     }
+
+    // Normalise to camelCase so controllers stay consistent
+    req.user = {
+      _id: user.id,          // keep _id alias for backward compat
+      id:  user.id,
+      email: user.email,
+      shopName: user.shop_name,
+      phoneNumber: user.phone_number,
+      role: user.role,
+      emailVerified: user.email_verified,
+      preferences: {
+        notifications: {
+          email: user.notif_email,
+          sms:   user.notif_sms,
+        },
+        lowStockThreshold: user.low_stock_threshold,
+      },
+    };
 
     next();
   } catch (error) {
@@ -37,13 +57,10 @@ const protect = async (req, res, next) => {
 };
 
 /**
- * requireRole(...roles) — RBAC middleware factory
- * Usage: router.get('/admin', protect, requireRole('shop_owner', 'distributor'), handler)
+ * requireRole(...roles) — RBAC middleware factory.
  */
 const requireRole = (...roles) => (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({ message: 'Not authenticated' });
-  }
+  if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
   if (!roles.includes(req.user.role)) {
     return res.status(403).json({
       message: `Access denied. Required role(s): ${roles.join(', ')}`,
