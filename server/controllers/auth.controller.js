@@ -54,25 +54,32 @@ const signup = async (req, res, next) => {
         shop_name:    shopName,
         phone_number: phoneNumber,
         role:         role || 'shop_owner',
+        email_verified: true, // Auto-verify for MVP
       })
       .select()
       .single();
 
     if (error) throw error;
 
-    // Generate OTP and persist to otp_store table
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    // Skip OTP for MVP
+    // const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // ...
+    // await sendVerificationEmail(email, otp);
 
-    await supabase
-      .from('otp_store')
-      .upsert({ email: email.toLowerCase(), otp, expires_at: expiresAt });
+    const accessToken  = generateAccessToken(user.id, user.role);
+    const refreshToken = generateRefreshToken(user.id);
 
-    await sendVerificationEmail(email, otp);
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge:   7 * 24 * 60 * 60 * 1000,
+    });
 
     res.status(201).json({
-      message: 'User registered. Check your email for the verification code.',
-      userId: user.id,
+      message: 'User registered successfully',
+      accessToken,
+      user: toPublicUser(user),
     });
   } catch (error) {
     next(error);
@@ -167,9 +174,10 @@ const login = async (req, res, next) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    if (!user.email_verified) {
-      return res.status(403).json({ message: 'Please verify your email first' });
-    }
+    // Skip verification check for MVP
+    // if (!user.email_verified) {
+    //   return res.status(403).json({ message: 'Please verify your email first' });
+    // }
 
     const accessToken  = generateAccessToken(user.id, user.role);
     const refreshToken = generateRefreshToken(user.id);

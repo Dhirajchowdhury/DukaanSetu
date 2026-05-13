@@ -26,7 +26,7 @@ connectDB();
 // ── Security & parsing middleware ─────────────────────────────────────────────
 app.use(helmet());
 app.use(cors({
-  origin:      process.env.CLIENT_URL || 'http://localhost:5173',
+  origin:      [process.env.CLIENT_URL || 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
   credentials: true,
 }));
 app.use(express.json());
@@ -69,4 +69,10 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV}`);
   console.log(`🗄️  Database: Supabase (PostgreSQL)`);
+}).on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`Port ${PORT} is already in use`);
+  } else {
+    console.error(err);
+  }
 });
