@@ -1,105 +1,115 @@
-import { useState, useMemo, useCallback } from 'react';
-import { Product, InventoryFilterState, SortField, SortOrder } from '../types';
-import { mockProducts } from '../data/mockData';
+import { useState, useEffect, useCallback } from 'react';
+import api from '../../services/api';
+import { Product, InventoryFilterState, ProductStatus } from '../types';
 import { useDebounce } from './useDebounce';
+import toast from 'react-hot-toast';
 
 export function useInventory() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 20;
+
   const [filters, setFilters] = useState<InventoryFilterState>({
     searchQuery: '',
     categoryId: null,
     status: 'All',
-    sortBy: 'lastUpdated',
-    sortOrder: 'desc',
+    sortBy: 'name',
+    sortOrder: 'asc',
   });
-  const [page, setPage] = useState(1);
-  const itemsPerPage = 20;
 
   const debouncedSearch = useDebounce(filters.searchQuery, 300);
 
-  // Filter and Sort
-  const filteredAndSortedProducts = useMemo(() => {
-    let result = [...products];
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: any = {
+        page,
+        limit: itemsPerPage,
+        search: debouncedSearch,
+        sortBy: filters.sortBy === 'name' ? 'productName' : filters.sortBy,
+        order: filters.sortOrder,
+      };
 
-    // Search
-    if (debouncedSearch) {
-      const lowerQuery = debouncedSearch.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.name.toLowerCase().includes(lowerQuery) ||
-          p.sku.toLowerCase().includes(lowerQuery) ||
-          p.categoryName.toLowerCase().includes(lowerQuery)
-      );
+      if (filters.categoryId) params.category = filters.categoryId;
+      if (filters.status === 'Low Stock') params.stockLevel = 'low';
+      if (filters.status === 'Out of Stock') params.stockLevel = 'out';
+
+      const { data } = await api.get('/products', { params });
+      
+      // Map backend fields to frontend Product interface
+      const mappedProducts: Product[] = data.products.map((p: any) => ({
+        id: p.id,
+        name: p.productName,
+        categoryId: p.category_id,
+        categoryName: p.categories?.name || 'Uncategorized',
+        quantity: p.quantity,
+        price: p.sellingPrice || 0,
+        expiryDate: p.expiryDate,
+        status: p.quantity <= 0 ? 'Out of Stock' : p.isLowStock ? 'Low Stock' : 'In Stock',
+        sku: p.barcode || 'N/A',
+        lastUpdated: p.updatedAt,
+      }));
+
+      setProducts(mappedProducts);
+      setTotalProducts(data.pagination.total);
+      setTotalPages(data.pagination.pages);
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
+      toast.error('Failed to load inventory');
+    } finally {
+      setLoading(false);
     }
+  }, [page, debouncedSearch, filters.categoryId, filters.status, filters.sortBy, filters.sortOrder]);
 
-    // Category
-    if (filters.categoryId) {
-      result = result.filter((p) => p.categoryId === filters.categoryId);
-    }
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
-    // Status
-    if (filters.status !== 'All') {
-      result = result.filter((p) => p.status === filters.status);
-    }
-
-    // Sort
-    result.sort((a, b) => {
-      let aVal = a[filters.sortBy];
-      let bVal = b[filters.sortBy];
-
-      if (aVal === null) return 1;
-      if (bVal === null) return -1;
-
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        return filters.sortOrder === 'asc'
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
-      }
-
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return filters.sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-      }
-
-      return 0;
-    });
-
-    return result;
-  }, [products, debouncedSearch, filters.categoryId, filters.status, filters.sortBy, filters.sortOrder]);
-
-  // Pagination
-  const totalPages = Math.ceil(filteredAndSortedProducts.length / itemsPerPage);
-  const paginatedProducts = useMemo(() => {
-    const startIndex = (page - 1) * itemsPerPage;
-    return filteredAndSortedProducts.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredAndSortedProducts, page]);
-
-  // Actions
   const updateFilter = useCallback((key: keyof InventoryFilterState, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
-    setPage(1); // Reset page on filter change
+    setPage(1);
   }, []);
 
-  const addProduct = useCallback((newProduct: Omit<Product, 'id' | 'sku' | 'lastUpdated'>) => {
-    const id = `prod-${Date.now()}`;
-    const sku = `SKU-${newProduct.categoryName.substring(0, 3).toUpperCase()}-${Math.floor(Math.random() * 10000)}`;
-    const lastUpdated = new Date().toISOString();
-    
-    setProducts((prev) => [{ ...newProduct, id, sku, lastUpdated }, ...prev]);
-  }, []);
+  const addProduct = async (productData: any) => {
+    try {
+      await api.post('/products', productData);
+      toast.success('Product added successfully');
+      fetchProducts();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to add product');
+      throw error;
+    }
+  };
 
-  const editProduct = useCallback((id: string, updatedProduct: Partial<Product>) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...updatedProduct, lastUpdated: new Date().toISOString() } : p))
-    );
-  }, []);
+  const deleteProduct = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    try {
+      await api.delete(`/products/${id}`);
+      toast.success('Product deleted successfully');
+      fetchProducts();
+    } catch (error) {
+      toast.error('Failed to delete product');
+    }
+  };
 
-  const deleteProduct = useCallback((id: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-  }, []);
+  const editProduct = async (id: string, productData: any) => {
+    try {
+      await api.put(`/products/${id}`, productData);
+      toast.success('Product updated successfully');
+      fetchProducts();
+    } catch (error) {
+      toast.error('Failed to update product');
+      throw error;
+    }
+  };
 
   return {
-    products: paginatedProducts,
-    totalProducts: filteredAndSortedProducts.length,
+    products,
+    loading,
+    totalProducts,
     totalPages,
     page,
     setPage,
@@ -108,5 +118,6 @@ export function useInventory() {
     addProduct,
     editProduct,
     deleteProduct,
+    refresh: fetchProducts,
   };
 }

@@ -34,20 +34,23 @@ export const InventoryPage: React.FC = () => {
     }
   };
 
-  const handleFormSubmit = (productData: Omit<Product, 'id' | 'sku' | 'lastUpdated'>) => {
-    if (editingProduct) {
-      inventory.editProduct(editingProduct.id, productData);
-      toast.success('Product updated successfully!');
-    } else {
-      inventory.addProduct(productData);
-      toast.success('Product added successfully!');
+  const handleFormSubmit = async (productData: any) => {
+    try {
+      if (editingProduct) {
+        await inventory.editProduct(editingProduct.id, productData);
+      } else {
+        await inventory.addProduct(productData);
+      }
+      setIsFormOpen(false);
+    } catch (error) {
+      // Error handled by hook
     }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (productToDelete) {
-      inventory.deleteProduct(productToDelete.id);
-      toast.success('Product deleted successfully!');
+      await inventory.deleteProduct(productToDelete.id);
+      setIsDeleteOpen(false);
     }
   };
 

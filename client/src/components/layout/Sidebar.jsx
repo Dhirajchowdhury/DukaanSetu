@@ -2,14 +2,16 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   FiHome, FiBox, FiTag, FiBarChart2, FiSettings,
-  FiLogOut, FiMenu, FiX, FiChevronRight,
+  FiLogOut, FiMenu, FiX, FiChevronRight, FiShare2, FiShoppingBag
 } from 'react-icons/fi';
 import { useAuth, getDashboardPath } from '../../context/AuthContext';
 import './Sidebar.css';
 
 const NAV_ITEMS = [
   { path: null,          icon: <FiHome />,     label: 'Dashboard', isDashboard: true },
-  { path: '/products',   icon: <FiBox />,      label: 'Products' },
+  { path: '/products',   icon: <FiBox />,      label: 'Inventory' },
+  { path: '/connect',    icon: <FiShare2 />,   label: 'Connect' },
+  { path: '/orders',     icon: <FiShoppingBag />, label: 'Orders' },
   { path: '/categories', icon: <FiTag />,      label: 'Categories' },
   { path: '/reports',    icon: <FiBarChart2 />, label: 'Reports' },
   { path: '/settings',   icon: <FiSettings />, label: 'Settings' },

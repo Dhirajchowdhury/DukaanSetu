@@ -1,6 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { InventoryFilterState } from '../types';
-import { mockCategories } from '../data/mockData';
+import api from '../../../services/api';
+
+interface Category {
+  _id: string;
+  name: string;
+}
 
 interface CategorySidebarProps {
   filters: InventoryFilterState;
@@ -8,6 +13,20 @@ interface CategorySidebarProps {
 }
 
 export const CategorySidebar: React.FC<CategorySidebarProps> = ({ filters, updateFilter }) => {
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const { data } = await api.get('/categories');
+        setCategories(data.categories || []);
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+      }
+    };
+    fetchCategories();
+  }, []);
+
   return (
     <aside className="category-sidebar">
       <div className="sidebar-header">Categories</div>
@@ -18,11 +37,11 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({ filters, updat
         >
           <span>All Categories</span>
         </li>
-        {mockCategories.map((category) => (
+        {categories.map((category) => (
           <li 
-            key={category.id}
-            className={`category-item ${filters.categoryId === category.id ? 'active' : ''}`}
-            onClick={() => updateFilter('categoryId', category.id)}
+            key={category._id}
+            className={`category-item ${filters.categoryId === category._id ? 'active' : ''}`}
+            onClick={() => updateFilter('categoryId', category._id)}
           >
             <span>{category.name}</span>
           </li>

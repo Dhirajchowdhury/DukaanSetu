@@ -130,15 +130,95 @@ CREATE TABLE IF NOT EXISTS scan_history (
 CREATE INDEX IF NOT EXISTS idx_scan_history_user_id    ON scan_history (user_id);
 CREATE INDEX IF NOT EXISTS idx_scan_history_scanned_at ON scan_history (scanned_at DESC);
 
+-- ── WHOLESALER PRODUCTS ──────────────────────────────────────────────────────
+-- Products listed by wholesalers/producers for shop owners to browse & order
+
+CREATE TABLE IF NOT EXISTS wholesaler_products (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  wholesaler_id   UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  product_name    TEXT        NOT NULL,
+  category        TEXT        NOT NULL DEFAULT 'General',
+  price_per_unit  NUMERIC(12, 2) NOT NULL CHECK (price_per_unit > 0),
+  moq             INTEGER     NOT NULL DEFAULT 1 CHECK (moq > 0),
+  stock_available INTEGER     NOT NULL DEFAULT 0 CHECK (stock_available >= 0),
+  unit            TEXT        NOT NULL DEFAULT 'pieces',
+  location        TEXT,
+  description     TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_wp_wholesaler_id  ON wholesaler_products (wholesaler_id);
+CREATE INDEX IF NOT EXISTS idx_wp_product_name   ON wholesaler_products (product_name);
+CREATE INDEX IF NOT EXISTS idx_wp_category       ON wholesaler_products (category);
+CREATE INDEX IF NOT EXISTS idx_wp_price          ON wholesaler_products (price_per_unit ASC);
+CREATE INDEX IF NOT EXISTS idx_wp_fts ON wholesaler_products
+  USING GIN (to_tsvector('english', product_name || ' ' || COALESCE(category, '')));
+
+CREATE TRIGGER trg_wp_updated_at
+  BEFORE UPDATE ON wholesaler_products
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ── ORDERS ────────────────────────────────────────────────────────────────────
+
+CREATE TYPE order_status AS ENUM ('pending', 'accepted', 'dispatched', 'delivered', 'cancelled');
+
+CREATE TABLE IF NOT EXISTS orders (
+  id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  buyer_id      UUID         NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  seller_id     UUID         NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  product_id    UUID         NOT NULL REFERENCES wholesaler_products (id) ON DELETE CASCADE,
+  quantity      INTEGER      NOT NULL CHECK (quantity > 0),
+  total_price   NUMERIC(12, 2) NOT NULL CHECK (total_price > 0),
+  status        order_status NOT NULL DEFAULT 'pending',
+  notes         TEXT,
+  created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_orders_buyer_id  ON orders (buyer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_seller_id ON orders (seller_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status    ON orders (status);
+CREATE INDEX IF NOT EXISTS idx_orders_created   ON orders (created_at DESC);
+
+CREATE TRIGGER trg_orders_updated_at
+  BEFORE UPDATE ON orders
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ── CONNECTIONS ───────────────────────────────────────────────────────────────
+
+CREATE TYPE connection_status AS ENUM ('pending', 'accepted', 'rejected');
+
+CREATE TABLE IF NOT EXISTS connections (
+  id             UUID              PRIMARY KEY DEFAULT gen_random_uuid(),
+  shop_owner_id  UUID              NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  wholesaler_id  UUID              NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  status         connection_status NOT NULL DEFAULT 'pending',
+  created_at     TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_connection UNIQUE (shop_owner_id, wholesaler_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_conn_shop_owner  ON connections (shop_owner_id);
+CREATE INDEX IF NOT EXISTS idx_conn_wholesaler  ON connections (wholesaler_id);
+CREATE INDEX IF NOT EXISTS idx_conn_status      ON connections (status);
+
+CREATE TRIGGER trg_connections_updated_at
+  BEFORE UPDATE ON connections
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
 -- ── ROW LEVEL SECURITY ────────────────────────────────────────────────────────
 -- The backend uses the service-role key which bypasses RLS.
 -- These policies protect direct client access if you ever enable it.
 
-ALTER TABLE users        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE categories   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE products     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE scan_history ENABLE ROW LEVEL SECURITY;
-ALTER TABLE otp_store    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scan_history       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE otp_store          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wholesaler_products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE connections        ENABLE ROW LEVEL SECURITY;
 
 -- Service role bypasses all policies — no additional policies needed for backend.
 -- If you add a frontend Supabase client, add user-scoped policies here.

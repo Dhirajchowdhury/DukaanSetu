@@ -30,7 +30,11 @@ const connectDB = async () => {
     console.log('✅ Supabase (PostgreSQL) connected');
   } catch (err) {
     console.error('❌ Supabase connection error:', err.message);
-    process.exit(1);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    } else {
+      console.warn('⚠️  Continuing in development mode despite DB connection error...');
+    }
   }
 };
 

@@ -1,16 +1,16 @@
 import React from 'react';
 import Sidebar from '../components/layout/Sidebar';
-import InventoryPage from '../features/inventory/pages/InventoryPage';
+import OrdersFeature from '../features/orders/Orders';
 
-const Products = () => {
+const Orders = () => {
   return (
     <div className="dashboard-layout">
       <Sidebar />
       <main className="dashboard-main" style={{ padding: 0 }}>
-        <InventoryPage />
+        <OrdersFeature />
       </main>
     </div>
   );
 };
 
-export default Products;
+export default Orders;

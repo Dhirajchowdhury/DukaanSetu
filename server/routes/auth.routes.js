@@ -38,18 +38,17 @@ router.get('/google',
 router.get('/google/callback',
   passport.authenticate('google', { session: false, failureRedirect: '/login' }),
   (req, res) => {
-    // Embed role in access token
-    const accessToken = generateAccessToken(req.user._id, req.user.role);
-    const refreshToken = generateRefreshToken(req.user._id);
+    // req.user is the raw Supabase row — use .id (not ._id)
+    const accessToken  = generateAccessToken(req.user.id, req.user.role);
+    const refreshToken = generateRefreshToken(req.user.id);
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure:   process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge:   7 * 24 * 60 * 60 * 1000,
     });
 
-    // Pass role so frontend can redirect correctly
     res.redirect(
       `${process.env.CLIENT_URL}/auth/callback?token=${accessToken}&role=${req.user.role}`
     );

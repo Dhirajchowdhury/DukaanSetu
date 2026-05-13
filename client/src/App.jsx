@@ -16,6 +16,8 @@ import Products      from './pages/Products';
 import Categories    from './pages/Categories';
 import Reports       from './pages/Reports';
 import Settings      from './pages/Settings';
+import Connect       from './pages/Connect';
+import Orders        from './pages/Orders';
 
 // Role dashboards
 import ShopOwnerDashboard   from './pages/dashboards/ShopOwnerDashboard';
@@ -114,6 +116,12 @@ function App() {
             } />
             <Route path="/settings" element={
               <PrivateRoute><Settings /></PrivateRoute>
+            } />
+            <Route path="/connect" element={
+              <PrivateRoute><Connect /></PrivateRoute>
+            } />
+            <Route path="/orders" element={
+              <PrivateRoute><Orders /></PrivateRoute>
             } />
 
             {/* Catch-all */}

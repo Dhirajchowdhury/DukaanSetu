@@ -1,16 +1,16 @@
 import React from 'react';
 import Sidebar from '../components/layout/Sidebar';
-import InventoryPage from '../features/inventory/pages/InventoryPage';
+import ConnectFeature from '../features/connect/Connect';
 
-const Products = () => {
+const Connect = () => {
   return (
     <div className="dashboard-layout">
       <Sidebar />
       <main className="dashboard-main" style={{ padding: 0 }}>
-        <InventoryPage />
+        <ConnectFeature />
       </main>
     </div>
   );
 };
 
-export default Products;
+export default Connect;

@@ -96,7 +96,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                   </td>
                   <td>{product.categoryName}</td>
                   <td>{product.quantity}</td>
-                  <td>${product.price.toFixed(2)}</td>
+                  <td>₹{product.price.toFixed(2)}</td>
                   <td>
                     <span className={`status-badge ${getStatusClass(product.status)}`}>
                       {product.status}

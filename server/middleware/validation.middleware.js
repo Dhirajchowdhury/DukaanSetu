@@ -23,7 +23,7 @@ const loginValidation = [
  */
 const productValidation = [
   body('productName').trim().notEmpty().withMessage('Product name is required'),
-  body('categoryId').isMongoId().withMessage('Valid category ID is required'),
+  body('categoryId').isUUID().withMessage('Valid category ID (UUID) is required'),
   body('quantity').isNumeric().withMessage('Quantity must be a number'),
 ];
 
