@@ -14,12 +14,10 @@ const ROLES = [
 
 const Signup = () => {
   const navigate = useNavigate();
-  const { signup, verifyEmail } = useAuth();
-  const [step, setStep] = useState(1);
+  const { signup } = useAuth();
   const [form, setForm] = useState({
     email: '', password: '', shopName: '', phoneNumber: '', role: 'shop_owner',
   });
-  const [otp, setOtp] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -29,20 +27,7 @@ const Signup = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await signup(form);
-      setStep(2);
-    } catch {
-      // toast handled
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const { user } = await verifyEmail(form.email, otp);
+      const { user } = await signup(form);
       navigate(getDashboardPath(user), { replace: true });
     } catch {
       // toast handled
@@ -50,51 +35,6 @@ const Signup = () => {
       setLoading(false);
     }
   };
-
-  if (step === 2) {
-    return (
-      <div className="auth-page">
-        <div className="auth-split">
-          <div className="auth-brand">
-            <div className="auth-brand__inner">
-              <div className="auth-brand__logo">📦</div>
-              <h1 className="auth-brand__name">DukaanSetu</h1>
-              <p className="auth-brand__tagline">Almost there! Verify your email to get started.</p>
-            </div>
-          </div>
-          <div className="auth-form-panel">
-            <div className="auth-form-wrap">
-              <div className="auth-form-header">
-                <div className="auth-otp-icon">✉️</div>
-                <h2>Check your email</h2>
-                <p>We sent a 6-digit code to <strong>{form.email}</strong></p>
-              </div>
-              <form onSubmit={handleVerify} className="auth-form">
-                <div className="form-group">
-                  <label className="form-label">Verification Code</label>
-                  <input
-                    className="form-input auth-otp-input"
-                    type="text"
-                    value={otp}
-                    onChange={e => setOtp(e.target.value)}
-                    placeholder="000000"
-                    maxLength="6"
-                    required
-                  />
-                </div>
-                <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
-                  {loading ? <><span className="spinner" /> Verifying...</> : 'Verify Email'}
-                </button>
-              </form>
-              <p className="auth-footer-text">
-                Wrong email? <button className="auth-link-btn" onClick={() => setStep(1)}>Go back</button>
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="auth-page">

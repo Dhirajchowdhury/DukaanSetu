@@ -51,7 +51,9 @@ export const AuthProvider = ({ children }) => {
   const signup = async (userData) => {
     try {
       const { data } = await api.post('/auth/signup', userData);
-      toast.success('Account created! Check your email for the verification code.');
+      localStorage.setItem('accessToken', data.accessToken);
+      setUser(data.user);
+      toast.success('Account created! Welcome to DukaanSetu.');
       return data;
     } catch (error) {
       toast.error(error.response?.data?.message || 'Signup failed');

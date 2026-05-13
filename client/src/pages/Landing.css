@@ -46,7 +46,7 @@
   position: relative;
   padding: 140px 0 0;
   overflow: hidden;
-  background: var(--secondary);
+  background: radial-gradient(circle at top right, #1e1b4b, #0f172a); 
 }
 
 /* Subtle dot-grid overlay */
@@ -107,7 +107,7 @@
   letter-spacing: -.02em;
 }
 .hero__title-accent {
-  background: linear-gradient(135deg, #60A5FA 0%, #34D399 100%);
+  background: linear-gradient(135deg, #38bdf8 0%, #34d399 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -115,7 +115,7 @@
 
 .hero__sub {
   font-size: 1.1rem;
-  color: rgba(255,255,255,.7);
+  color: rgba(255,255,255,.85);
   max-width: 580px;
   margin: 0 auto 36px;
   line-height: 1.7;
@@ -153,7 +153,7 @@
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: rgba(255,255,255,.55);
+  color: rgba(255,255,255,.7);
 }
 .hero__trust-item svg { color: var(--accent); }
 
@@ -476,7 +476,7 @@
    ============================================================ */
 .cta-section {
   padding: 96px 0;
-  background: var(--secondary);
+  background: radial-gradient(circle at bottom left, #1e1b4b, #0f172a); 
   position: relative;
   overflow: hidden;
 }
@@ -503,7 +503,7 @@
 }
 .cta-section__sub {
   font-size: 1rem;
-  color: rgba(255,255,255,.65);
+  color: rgba(255,255,255,.8);
   max-width: 520px;
   margin: 0 auto 36px;
   line-height: 1.7;

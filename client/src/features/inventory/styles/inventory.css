@@ -1,18 +1,18 @@
 /* inventory.css */
 :root {
-  --inv-bg-primary: #F8FAFC;
-  --inv-bg-secondary: #FFFFFF;
-  --inv-text-primary: #0F172A;
-  --inv-text-secondary: #64748B;
-  --inv-border: #E2E8F0;
-  --inv-accent: #3B82F6;
-  --inv-accent-hover: #2563EB;
-  --inv-danger: #EF4444;
-  --inv-warning: #F59E0B;
-  --inv-success: #10B981;
-  --inv-radius: 12px;
-  --inv-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --inv-transition: all 0.2s ease-in-out;
+  --inv-bg-primary: var(--bg);
+  --inv-bg-secondary: var(--surface);
+  --inv-text-primary: var(--text);
+  --inv-text-secondary: var(--text-secondary);
+  --inv-border: var(--border);
+  --inv-accent: var(--primary);
+  --inv-accent-hover: var(--primary-hover);
+  --inv-danger: var(--danger);
+  --inv-warning: var(--warning);
+  --inv-success: var(--success);
+  --inv-radius: var(--radius-md);
+  --inv-shadow: var(--shadow-sm);
+  --inv-transition: var(--transition);
   --inv-glass-bg: rgba(255, 255, 255, 0.8);
 }
 
