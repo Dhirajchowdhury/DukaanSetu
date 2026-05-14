@@ -139,7 +139,7 @@ JWT_ACCESS_EXPIRY=15m
 JWT_REFRESH_EXPIRY=7d
 PORT=5000
 NODE_ENV=development
-CLIENT_URL=http://localhost:5173
+CLIENT_URL=https://dukaansetu.vercel.app
 
 # Optional
 EMAIL_HOST=smtp.gmail.com
@@ -151,12 +151,12 @@ TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_secret
-GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
+GOOGLE_CALLBACK_URL=https://dukaansetu.onrender.com/api/auth/google/callback
 ```
 
 **`client/.env`**
 ```env
-VITE_API_URL=http://localhost:5000
+VITE_API_URL=https://dukaansetu.onrender.com
 VITE_GOOGLE_CLIENT_ID=your_google_client_id
 ```
 
@@ -177,8 +177,8 @@ cd server && npm run dev
 cd client && npm run dev
 ```
 
-App runs at: **http://localhost:5173**
-API runs at: **http://localhost:5000**
+App runs at: **https://dukaansetu.vercel.app**
+API runs at: **https://dukaansetu.onrender.com**
 
 ---
 

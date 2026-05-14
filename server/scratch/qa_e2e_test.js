@@ -2,7 +2,7 @@ const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = `${process.env.SERVER_URL}/api`;
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 const TEST_USER = {

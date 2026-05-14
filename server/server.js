@@ -26,12 +26,7 @@ connectDB();
 // ── Security & parsing middleware ─────────────────────────────────────────────
 app.use(helmet());
 app.use(cors({
-  origin: [
-    process.env.CLIENT_URL,
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:5175'
-  ].filter(Boolean),
+  origin:      process.env.CLIENT_URL,
   credentials: true,
 }));
 app.use(express.json());
