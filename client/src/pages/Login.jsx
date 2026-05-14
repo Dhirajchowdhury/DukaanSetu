@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, getDashboardPath } from '../context/AuthContext';
 import { FiMail, FiLock, FiEye, FiEyeOff, FiAlertCircle } from 'react-icons/fi';
 import { FaGoogle } from 'react-icons/fa';
+import { API_URL } from '../config/api';
 import './Auth.css';
 
 const Login = () => {
@@ -44,7 +45,7 @@ const Login = () => {
 
   const handleGoogle = () => {
     setGoogleLoading(true);
-    window.location.href = `${import.meta.env.VITE_API_URL}/api/auth/google`;
+    window.location.href = `${API_URL}/api/auth/google`;
   };
 
   return (

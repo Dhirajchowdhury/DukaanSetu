@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, getDashboardPath } from '../context/AuthContext';
 import { FiMail, FiLock, FiUser, FiPhone, FiEye, FiEyeOff } from 'react-icons/fi';
 import { FaGoogle } from 'react-icons/fa';
+import { API_URL } from '../config/api';
 import './Auth.css';
 
 const ROLES = [
@@ -156,7 +157,7 @@ const Signup = () => {
 
             <button
               className="btn btn-secondary btn-block"
-              onClick={() => window.location.href = `${import.meta.env.VITE_API_URL}/api/auth/google`}
+              onClick={() => window.location.href = `${API_URL}/api/auth/google`}
             >
               <FaGoogle /> Continue with Google
             </button>

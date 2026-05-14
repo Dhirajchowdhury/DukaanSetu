@@ -36,7 +36,7 @@ router.get('/google',
 );
 
 router.get('/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: '/login' }),
+  passport.authenticate('google', { session: false, failureRedirect: `${process.env.CLIENT_URL}/login` }),
   (req, res) => {
     // req.user is the raw Supabase row — use .id (not ._id)
     const accessToken  = generateAccessToken(req.user.id, req.user.role);
@@ -45,7 +45,7 @@ router.get('/google/callback',
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure:   process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge:   7 * 24 * 60 * 60 * 1000,
     });
 
