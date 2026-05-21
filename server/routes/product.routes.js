@@ -7,6 +7,7 @@ const {
   deleteProduct,
   getStats,
   adjustStock,
+  getTopProducts,
 } = require('../controllers/product.controller');
 const { protect } = require('../middleware/auth.middleware');
 const { productValidation, validate } = require('../middleware/validation.middleware');
@@ -15,16 +16,20 @@ const router = express.Router();
 
 router.use(protect);
 
+
 router.route('/')
   .get(getProducts)
   .post(productValidation, validate, createProduct);
 
 router.get('/stats', getStats);
 
+router.get('/top/:userId', getTopProducts);
+
 router.route('/:id')
   .get(getProduct)
   .put(updateProduct)
   .delete(deleteProduct);
+
 
 router.patch('/:id/stock', adjustStock);
 

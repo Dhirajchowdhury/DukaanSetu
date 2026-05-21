@@ -101,6 +101,7 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
+    setUser,
     loading,
     signup,
     verifyEmail,
@@ -108,6 +109,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     isAuthenticated: !!user,
     dashboardPath: getDashboardPath(user),
+    checkAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

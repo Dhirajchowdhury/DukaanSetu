@@ -194,6 +194,7 @@ CREATE TABLE IF NOT EXISTS connections (
   shop_owner_id  UUID              NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   wholesaler_id  UUID              NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   status         connection_status NOT NULL DEFAULT 'pending',
+  initiator_id   UUID              REFERENCES users (id) ON DELETE SET NULL,
   created_at     TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_connection UNIQUE (shop_owner_id, wholesaler_id)
@@ -205,6 +206,61 @@ CREATE INDEX IF NOT EXISTS idx_conn_status      ON connections (status);
 
 CREATE TRIGGER trg_connections_updated_at
   BEFORE UPDATE ON connections
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ── LOCATION & PROFILE EXTENSIONS ───────────────────────────────────────────
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS latitude            DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS longitude           DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS address             TEXT,
+  ADD COLUMN IF NOT EXISTS is_profile_complete BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- ── CONVERSATIONS ─────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS conversations (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user1_id   UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  user2_id   UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_conversation UNIQUE (user1_id, user2_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_conv_user1 ON conversations (user1_id);
+CREATE INDEX IF NOT EXISTS idx_conv_user2 ON conversations (user2_id);
+
+-- ── MESSAGES ──────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS messages (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID        NOT NULL REFERENCES conversations (id) ON DELETE CASCADE,
+  sender_id       UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  message         TEXT        NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_conv_id ON messages (conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created ON messages (created_at ASC);
+
+-- ── INQUIRIES ─────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS inquiries (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  buyer_id   UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  seller_id  UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  product_id UUID        NOT NULL REFERENCES wholesaler_products (id) ON DELETE CASCADE,
+  quantity   INTEGER     NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  message    TEXT,
+  status     TEXT        NOT NULL DEFAULT 'pending'
+               CHECK (status IN ('pending','replied','closed')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_inquiries_buyer  ON inquiries (buyer_id);
+CREATE INDEX IF NOT EXISTS idx_inquiries_seller ON inquiries (seller_id);
+
+CREATE TRIGGER trg_inquiries_updated_at
+  BEFORE UPDATE ON inquiries
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ── ROW LEVEL SECURITY ────────────────────────────────────────────────────────
@@ -219,6 +275,9 @@ ALTER TABLE otp_store          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wholesaler_products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE connections        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversations      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inquiries          ENABLE ROW LEVEL SECURITY;
 
 -- Service role bypasses all policies — no additional policies needed for backend.
 -- If you add a frontend Supabase client, add user-scoped policies here.

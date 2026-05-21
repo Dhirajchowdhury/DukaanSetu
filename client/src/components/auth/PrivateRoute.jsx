@@ -3,10 +3,11 @@ import { useAuth, getDashboardPath } from '../../context/AuthContext';
 
 /**
  * PrivateRoute — redirects unauthenticated users to /login.
- * Preserves the attempted URL so we can redirect back after login.
+ * Also redirects incomplete profiles to /onboarding, and guards
+ * the onboarding page from complete profiles.
  */
 const PrivateRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -22,9 +23,21 @@ const PrivateRoute = ({ children }) => {
     );
   }
 
-  return isAuthenticated
-    ? children
-    : <Navigate to="/login" state={{ from: location }} replace />;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Force onboarding if profile is incomplete
+  if (user && user.isProfileComplete === false && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  // Redirect to dashboard if profile is complete and trying to hit onboarding
+  if (user && user.isProfileComplete === true && location.pathname === '/onboarding') {
+    return <Navigate to={getDashboardPath(user)} replace />;
+  }
+
+  return children;
 };
 
 export default PrivateRoute;

@@ -13,6 +13,10 @@ const toPublicUser = (row) => ({
   phoneNumber:  row.phone_number,
   role:         row.role,
   emailVerified: row.email_verified,
+  latitude:     row.latitude,
+  longitude:    row.longitude,
+  address:      row.address,
+  isProfileComplete: row.is_profile_complete,
   preferences: {
     notifications: {
       email: row.notif_email,

@@ -395,6 +395,24 @@ const adjustStock = async (req, res, next) => {
   }
 };
 
+const getTopProducts = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { data: products, error } = await supabase
+      .from('wholesaler_products')
+      .select('*')
+      .eq('wholesaler_id', userId)
+      .gt('stock_available', 0)
+      .order('price_per_unit', { ascending: true })
+      .limit(3);
+
+    if (error) throw error;
+    res.json({ products: products || [] });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getProducts,
   getProduct,
@@ -403,4 +421,5 @@ module.exports = {
   deleteProduct,
   getStats,
   adjustStock,
+  getTopProducts,
 };

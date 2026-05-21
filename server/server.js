@@ -17,6 +17,10 @@ const barcodeRoutes      = require('./routes/barcode.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const connectRoutes      = require('./routes/connect.routes');
 const ordersRoutes       = require('./routes/orders.routes');
+const profileRoutes      = require('./routes/profile.routes');
+const chatRoutes         = require('./routes/chat.routes');
+const inquiryRoutes      = require('./routes/inquiry.routes');
+const connectionRoutes   = require('./routes/connection.routes');
 
 const app = express();
 
@@ -52,6 +56,10 @@ app.use('/api/barcode',       barcodeRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/connect',       connectRoutes);
 app.use('/api/orders',        ordersRoutes);
+app.use('/api/profile',       profileRoutes);
+app.use('/api/chat',          chatRoutes);
+app.use('/api/inquiries',     inquiryRoutes);
+app.use('/api/connections',   connectionRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {

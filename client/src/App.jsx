@@ -18,6 +18,7 @@ import Reports       from './pages/Reports';
 import Settings      from './pages/Settings';
 import Connect       from './pages/Connect';
 import Orders        from './pages/Orders';
+import Onboarding    from './pages/Onboarding';
 
 // Role dashboards
 import ShopOwnerDashboard   from './pages/dashboards/ShopOwnerDashboard';
@@ -120,8 +121,14 @@ function App() {
             <Route path="/connect" element={
               <PrivateRoute><Connect /></PrivateRoute>
             } />
+            <Route path="/connect/profile/:id" element={
+              <PrivateRoute><Connect /></PrivateRoute>
+            } />
             <Route path="/orders" element={
               <PrivateRoute><Orders /></PrivateRoute>
+            } />
+            <Route path="/onboarding" element={
+              <PrivateRoute><Onboarding /></PrivateRoute>
             } />
 
             {/* Catch-all */}

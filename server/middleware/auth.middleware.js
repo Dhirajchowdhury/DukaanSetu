@@ -21,7 +21,7 @@ const protect = async (req, res, next) => {
     // Fetch user row from Supabase
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, shop_name, phone_number, role, email_verified, notif_email, notif_sms, low_stock_threshold, created_at')
+      .select('id, email, shop_name, phone_number, role, email_verified, notif_email, notif_sms, low_stock_threshold, latitude, longitude, address, is_profile_complete, created_at')
       .eq('id', decoded.id)
       .single();
 
@@ -38,6 +38,10 @@ const protect = async (req, res, next) => {
       phoneNumber: user.phone_number,
       role: user.role,
       emailVerified: user.email_verified,
+      latitude: user.latitude,
+      longitude: user.longitude,
+      address: user.address,
+      isProfileComplete: user.is_profile_complete,
       preferences: {
         notifications: {
           email: user.notif_email,
