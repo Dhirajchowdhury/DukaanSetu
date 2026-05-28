@@ -17,6 +17,7 @@ import Categories    from './pages/Categories';
 import Reports       from './pages/Reports';
 import Settings      from './pages/Settings';
 import Connect       from './pages/Connect';
+import Connections   from './pages/Connections';
 import Orders        from './pages/Orders';
 import Onboarding    from './pages/Onboarding';
 
@@ -123,6 +124,9 @@ function App() {
             } />
             <Route path="/connect/profile/:id" element={
               <PrivateRoute><Connect /></PrivateRoute>
+            } />
+            <Route path="/connections" element={
+              <PrivateRoute><Connections /></PrivateRoute>
             } />
             <Route path="/orders" element={
               <PrivateRoute><Orders /></PrivateRoute>

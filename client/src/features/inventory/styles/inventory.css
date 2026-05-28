@@ -458,3 +458,63 @@
   text-align: center;
   color: var(--inv-text-secondary);
 }
+
+/* ── Inventory CTA buttons ─────────────────────────────────────────────────── */
+.inv-btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(13,148,136,.25);
+  transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+  white-space: nowrap;
+}
+.inv-btn-primary:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(13,148,136,.35);
+}
+
+.inv-btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background var(--transition), border-color var(--transition);
+  white-space: nowrap;
+}
+.inv-btn-secondary:hover {
+  background: var(--border);
+  border-color: var(--border-strong);
+}
+
+/* Mobile FAB for Add Product */
+@media (max-width: 768px) {
+  .inv-btn-primary {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 100;
+    border-radius: 50px;
+    padding: 14px 20px;
+    font-size: 15px;
+    box-shadow: 0 6px 20px rgba(13,148,136,.4);
+  }
+  .inv-btn-secondary {
+    display: none;
+  }
+}

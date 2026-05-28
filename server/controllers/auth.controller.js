@@ -16,13 +16,15 @@ const toPublicUser = (row) => ({
   latitude:     row.latitude,
   longitude:    row.longitude,
   address:      row.address,
+  city:         row.city,
+  state:        row.state,
   isProfileComplete: row.is_profile_complete,
   preferences: {
     notifications: {
       email: row.notif_email,
       sms:   row.notif_sms,
     },
-    lowStockThreshold: row.low_stock_threshold,
+    lowStockThreshold: 10, // Safe default fallback
   },
   createdAt: row.created_at,
 });
@@ -267,8 +269,6 @@ const updateProfile = async (req, res, next) => {
         updates.notif_email = preferences.notifications.email;
       if (preferences.notifications?.sms !== undefined)
         updates.notif_sms = preferences.notifications.sms;
-      if (preferences.lowStockThreshold !== undefined)
-        updates.low_stock_threshold = preferences.lowStockThreshold;
     }
 
     const { data: user, error } = await supabase

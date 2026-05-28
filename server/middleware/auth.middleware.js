@@ -21,7 +21,7 @@ const protect = async (req, res, next) => {
     // Fetch user row from Supabase
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, shop_name, phone_number, role, email_verified, notif_email, notif_sms, low_stock_threshold, latitude, longitude, address, is_profile_complete, created_at')
+      .select('id, email, shop_name, phone_number, role, email_verified, notif_email, notif_sms, latitude, longitude, address, city, state, is_profile_complete, created_at')
       .eq('id', decoded.id)
       .single();
 
@@ -31,7 +31,7 @@ const protect = async (req, res, next) => {
 
     // Normalise to camelCase so controllers stay consistent
     req.user = {
-      _id: user.id,          // keep _id alias for backward compat
+      _id: user.id,
       id:  user.id,
       email: user.email,
       shopName: user.shop_name,
@@ -41,13 +41,15 @@ const protect = async (req, res, next) => {
       latitude: user.latitude,
       longitude: user.longitude,
       address: user.address,
+      city: user.city,
+      state: user.state,
       isProfileComplete: user.is_profile_complete,
       preferences: {
         notifications: {
           email: user.notif_email,
           sms:   user.notif_sms,
         },
-        lowStockThreshold: user.low_stock_threshold,
+        lowStockThreshold: 10, // Safe default fallback
       },
     };
 

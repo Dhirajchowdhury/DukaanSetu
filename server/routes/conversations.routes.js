@@ -1,11 +1,11 @@
 const express = require('express');
-const { getConnections, createConnection } = require('../controllers/connection.controller');
+const { getConversations, startConversation } = require('../controllers/chat.controller');
 const { protect } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 router.use(protect);
 
-router.get('/', getConnections);
-router.post('/:userId', createConnection);
+router.get('/', getConversations);
+router.post('/', startConversation);
 
 module.exports = router;

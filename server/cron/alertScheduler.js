@@ -14,7 +14,7 @@ const checkAlerts = async () => {
     // Fetch all email-verified users
     const { data: users, error: usersErr } = await supabase
       .from('users')
-      .select('id, email, phone_number, notif_email, notif_sms, low_stock_threshold')
+      .select('id, email, phone_number, notif_email, notif_sms')
       .eq('email_verified', true);
 
     if (usersErr) throw usersErr;
@@ -24,14 +24,15 @@ const checkAlerts = async () => {
     const threeDays = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
 
     for (const user of users) {
-      const threshold = user.low_stock_threshold ?? 10;
-
       // ── Low stock ──────────────────────────────────────────────────────────
-      const { data: lowStockProducts } = await supabase
+      const { data: allUserProducts } = await supabase
         .from('products')
-        .select('id, product_name, quantity, unit')
-        .eq('user_id', user.id)
-        .lte('quantity', threshold);
+        .select('id, product_name, quantity, unit, low_stock_threshold, low_stock_alert_enabled')
+        .eq('user_id', user.id);
+
+      const lowStockProducts = (allUserProducts || []).filter(
+        p => p.low_stock_alert_enabled && p.quantity <= p.low_stock_threshold
+      );
 
       if (lowStockProducts?.length > 0) {
         if (user.notif_email) {

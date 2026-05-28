@@ -21,6 +21,8 @@ const profileRoutes      = require('./routes/profile.routes');
 const chatRoutes         = require('./routes/chat.routes');
 const inquiryRoutes      = require('./routes/inquiry.routes');
 const connectionRoutes   = require('./routes/connection.routes');
+const conversationsRoutes = require('./routes/conversations.routes');
+const messagesRoutes     = require('./routes/messages.routes');
 
 const app = express();
 
@@ -60,6 +62,8 @@ app.use('/api/profile',       profileRoutes);
 app.use('/api/chat',          chatRoutes);
 app.use('/api/inquiries',     inquiryRoutes);
 app.use('/api/connections',   connectionRoutes);
+app.use('/api/conversations', conversationsRoutes);
+app.use('/api/messages',      messagesRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {

@@ -1,5 +1,6 @@
 import React from 'react';
-import { FiSearch, FiPlus } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiTag } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
 import { InventoryFilterState } from '../types';
 
 interface InventoryHeaderProps {
@@ -8,14 +9,22 @@ interface InventoryHeaderProps {
   onAddClick: () => void;
 }
 
-export const InventoryHeader: React.FC<InventoryHeaderProps> = ({ filters, updateFilter, onAddClick }) => {
+export const InventoryHeader: React.FC<InventoryHeaderProps> = ({
+  filters,
+  updateFilter,
+  onAddClick,
+}) => {
+  const navigate = useNavigate();
+
   return (
     <div className="inventory-header">
       <div className="inventory-title">
         <h1>Inventory Management</h1>
         <p>Manage your entire stock, prices, and categories efficiently.</p>
       </div>
+
       <div className="inventory-actions">
+        {/* Search */}
         <div className="search-box">
           <FiSearch className="search-icon" />
           <input
@@ -25,7 +34,19 @@ export const InventoryHeader: React.FC<InventoryHeaderProps> = ({ filters, updat
             onChange={(e) => updateFilter('searchQuery', e.target.value)}
           />
         </div>
-        <button className="btn-primary" onClick={onAddClick}>
+
+        {/* Add Category — secondary CTA */}
+        <button
+          className="inv-btn-secondary"
+          onClick={() => navigate('/categories')}
+          title="Manage categories"
+        >
+          <FiTag />
+          Add Category
+        </button>
+
+        {/* Add Product — primary CTA */}
+        <button className="inv-btn-primary" onClick={onAddClick}>
           <FiPlus />
           Add Product
         </button>

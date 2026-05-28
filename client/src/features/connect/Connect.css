@@ -160,20 +160,62 @@
 }
 
 .profile-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  padding: 20px;
-  box-shadow: var(--shadow-sm);
-  position: relative;
-  transition: all var(--transition-slow);
+  perspective: 1000px;
+  height: 290px;
   cursor: pointer;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  position: relative;
 }
 
-.profile-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
-  border-color: var(--primary-muted);
+.profile-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-style: preserve-3d;
+}
+
+.profile-card:hover .profile-card-inner {
+  transform: rotateY(180deg);
+}
+
+.profile-card-front, .profile-card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-card-back {
+  transform: rotateY(180deg);
+  justify-content: space-between;
+}
+
+.profile-card__back-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+}
+
+.profile-card__back-products {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 12px;
 }
 
 .profile-card__header {
@@ -250,32 +292,6 @@
 .profile-card__stat-val {
   font-weight: 700;
   color: var(--text);
-}
-
-/* Hover Top Products Dropdown */
-.profile-card__hover-products {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-top: none;
-  border-bottom-left-radius: var(--radius-xl);
-  border-bottom-right-radius: var(--radius-xl);
-  padding: 12px 16px;
-  box-shadow: var(--shadow-lg);
-  z-index: 10;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-8px);
-  transition: all var(--transition);
-}
-
-.profile-card:hover .profile-card__hover-products {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
 }
 
 .profile-card__hover-title {

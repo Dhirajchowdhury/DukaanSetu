@@ -1,66 +1,44 @@
 const { supabase } = require('../config/db');
 
 /**
- * @desc  Place a new order
+ * @desc  Place a new order (with delivery location and MOQ/stock checks)
  * @route POST /api/orders
  */
 const createOrder = async (req, res, next) => {
   try {
-    const { productId, quantity, notes } = req.body;
+    const { productId, quantity, notes, deliveryLocation } = req.body;
 
     if (!productId || !quantity || quantity < 1) {
       return res.status(400).json({ message: 'productId and quantity (>0) are required' });
     }
 
-    // Fetch the listing to validate MOQ and compute price
-    const { data: listing, error: listErr } = await supabase
-      .from('wholesaler_products')
-      .select('id, wholesaler_id, product_name, price_per_unit, moq, stock_available, unit')
-      .eq('id', productId)
-      .single();
+    const { data, error } = await supabase.rpc('place_order_tx', {
+      p_buyer_id: req.user.id,
+      p_product_id: productId,
+      p_quantity: parseInt(quantity),
+      p_delivery_location: deliveryLocation || null,
+      p_notes: notes || null
+    });
 
-    if (listErr || !listing) {
-      return res.status(404).json({ message: 'Product listing not found' });
+    if (error) throw error;
+
+    if (!data.success) {
+      return res.status(400).json({ message: data.message });
     }
 
-    if (quantity < listing.moq) {
-      return res.status(400).json({
-        message: `Minimum order quantity is ${listing.moq} ${listing.unit || 'units'}`,
-      });
-    }
-
-    if (quantity > listing.stock_available) {
-      return res.status(400).json({
-        message: `Only ${listing.stock_available} units available`,
-      });
-    }
-
-    if (listing.wholesaler_id === req.user.id) {
-      return res.status(400).json({ message: 'You cannot order your own listing' });
-    }
-
-    const total_price = parseFloat(listing.price_per_unit) * quantity;
-
-    const { data: order, error } = await supabase
+    // Fetch the enriched order to return the same format
+    const { data: order, error: fetchErr } = await supabase
       .from('orders')
-      .insert({
-        buyer_id:    req.user.id,
-        seller_id:   listing.wholesaler_id,
-        product_id:  productId,
-        quantity,
-        total_price,
-        notes:       notes || null,
-        status:      'pending',
-      })
       .select(`
-        id, quantity, total_price, status, notes, created_at,
+        id, quantity, total_price, status, notes, delivery_location, created_at,
         wholesaler_products(product_name, price_per_unit, unit, category),
         buyer:users!buyer_id(id, shop_name, email),
         seller:users!seller_id(id, shop_name, email)
       `)
+      .eq('id', data.order_id)
       .single();
 
-    if (error) throw error;
+    if (fetchErr) throw fetchErr;
 
     res.status(201).json({ message: 'Order placed successfully', order });
   } catch (error) {
@@ -69,9 +47,90 @@ const createOrder = async (req, res, next) => {
 };
 
 /**
- * @desc  Get orders for the current user (as buyer OR seller)
+ * @desc  Get orders placed by the current user (buying)
+ * @route GET /api/orders/buying
+ */
+const getBuyingOrders = async (req, res, next) => {
+  try {
+    const { status, page = 1, limit = 20 } = req.query;
+    const from = (parseInt(page) - 1) * parseInt(limit);
+    const to   = from + parseInt(limit) - 1;
+
+    let query = supabase
+      .from('orders')
+      .select(`
+        *,
+        wholesaler_products(id, product_name, price_per_unit, unit, category),
+        buyer:users!buyer_id(id, shop_name, email),
+        seller:users!seller_id(id, shop_name, email)
+      `, { count: 'exact' })
+      .eq('buyer_id', req.user.id)
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (status) query = query.eq('status', status);
+
+    const { data, error, count } = await query;
+    if (error) throw error;
+
+    res.json({
+      orders: data || [],
+      pagination: {
+        page:  parseInt(page),
+        limit: parseInt(limit),
+        total: count,
+        pages: Math.ceil(count / parseInt(limit)),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc  Get orders received by the current user (selling)
+ * @route GET /api/orders/selling
+ */
+const getSellingOrders = async (req, res, next) => {
+  try {
+    const { status, page = 1, limit = 20 } = req.query;
+    const from = (parseInt(page) - 1) * parseInt(limit);
+    const to   = from + parseInt(limit) - 1;
+
+    let query = supabase
+      .from('orders')
+      .select(`
+        *,
+        wholesaler_products(id, product_name, price_per_unit, unit, category),
+        buyer:users!buyer_id(id, shop_name, email),
+        seller:users!seller_id(id, shop_name, email)
+      `, { count: 'exact' })
+      .eq('seller_id', req.user.id)
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (status) query = query.eq('status', status);
+
+    const { data, error, count } = await query;
+    if (error) throw error;
+
+    res.json({
+      orders: data || [],
+      pagination: {
+        page:  parseInt(page),
+        limit: parseInt(limit),
+        total: count,
+        pages: Math.ceil(count / parseInt(limit)),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc  Get all orders (both buying & selling)
  * @route GET /api/orders
- * @query role=buyer|seller|all (default: all)
  */
 const getOrders = async (req, res, next) => {
   try {
@@ -104,7 +163,7 @@ const getOrders = async (req, res, next) => {
     if (error) throw error;
 
     res.json({
-      orders: data,
+      orders: data || [],
       pagination: {
         page:  parseInt(page),
         limit: parseInt(limit),
@@ -118,7 +177,7 @@ const getOrders = async (req, res, next) => {
 };
 
 /**
- * @desc  Update order status (seller only)
+ * @desc  Update order status (seller only, or buyer cancellation)
  * @route PUT /api/orders/:id
  */
 const updateOrderStatus = async (req, res, next) => {
@@ -172,4 +231,10 @@ const updateOrderStatus = async (req, res, next) => {
   }
 };
 
-module.exports = { createOrder, getOrders, updateOrderStatus };
+module.exports = {
+  createOrder,
+  getBuyingOrders,
+  getSellingOrders,
+  getOrders,
+  updateOrderStatus
+};

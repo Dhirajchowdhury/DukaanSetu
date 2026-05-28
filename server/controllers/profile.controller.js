@@ -1,16 +1,6 @@
 const { supabase } = require('../config/db');
-
-/* ── Haversine distance (km) ─────────────────────────────────────────────── */
-const haversine = (lat1, lon1, lat2, lon2) => {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-};
+const locationService = require('../services/locationService');
+const { getDistanceKm } = require('../utils/distance');
 
 /* ── Build profile cards from flat listing rows ──────────────────────────── */
 const buildProfiles = (rows, currentUser) => {
@@ -24,9 +14,11 @@ const buildProfiles = (rows, currentUser) => {
         currentUser?.latitude && currentUser?.longitude &&
         item.wholesaler.latitude && item.wholesaler.longitude
       ) {
-        distance = haversine(
-          currentUser.latitude, currentUser.longitude,
-          item.wholesaler.latitude, item.wholesaler.longitude
+        distance = getDistanceKm(
+          parseFloat(currentUser.latitude),
+          parseFloat(currentUser.longitude),
+          parseFloat(item.wholesaler.latitude),
+          parseFloat(item.wholesaler.longitude)
         );
       }
       map[wid] = { wholesaler: item.wholesaler, products: [], minPrice: Infinity, maxPrice: -Infinity, distance };
@@ -42,6 +34,7 @@ const buildProfiles = (rows, currentUser) => {
     minPrice:     p.minPrice === Infinity  ? 0 : p.minPrice,
     maxPrice:     p.maxPrice === -Infinity ? 0 : p.maxPrice,
     distance:     p.distance !== null ? Math.round(p.distance * 10) / 10 : null,
+    distance_km:  p.distance !== null ? Math.round(p.distance * 10) / 10 : null,
     topProducts:  [...p.products]
       .sort((a, b) => a.price_per_unit - b.price_per_unit)
       .slice(0, 3)
@@ -52,18 +45,42 @@ const buildProfiles = (rows, currentUser) => {
 /**
  * @desc  Update current user's location + mark profile complete
  * @route PUT /api/profile/location
+ * body: { latitude, longitude, address, locationName }
  */
 const updateLocation = async (req, res, next) => {
   try {
-    const { latitude, longitude, address } = req.body;
+    const { latitude, longitude, address: manualAddress, city: manualCity, state: manualState } = req.body;
     if (latitude === undefined || longitude === undefined) {
       return res.status(400).json({ message: 'latitude and longitude are required' });
     }
+
+    // Auto reverse-geocode if address not provided
+    let address   = manualAddress   || null;
+    let city      = manualCity      || null;
+    let stateVal  = manualState     || null;
+
+    if (!address) {
+      try {
+        const geo = await locationService.reverseGeocode(parseFloat(latitude), parseFloat(longitude));
+        address  = geo.address || null;
+        city     = geo.city    || null;
+        stateVal = geo.state   || null;
+      } catch (geoErr) {
+        console.warn('Geocoding failed during updateLocation, continuing without address:', geoErr.message);
+      }
+    }
+
     const { data: user, error } = await supabase
       .from('users')
-      .update({ latitude, longitude, address: address || null })
+      .update({
+        latitude,
+        longitude,
+        address,
+        city:  city,
+        state: stateVal,
+      })
       .eq('id', req.user.id)
-      .select('id, latitude, longitude, address, is_profile_complete')
+      .select('id, latitude, longitude, address, city, state, is_profile_complete')
       .single();
     if (error) throw error;
     res.json({ message: 'Location updated', user });
@@ -101,6 +118,7 @@ const discoverProfiles = async (req, res, next) => {
     const {
       search, category, role, minPrice, maxPrice,
       location, sortBy = 'name', page = 1, limit = 20,
+      maxDistance, city,
     } = req.query;
 
     let query = supabase
@@ -117,6 +135,16 @@ const discoverProfiles = async (req, res, next) => {
 
     const { data: users, error } = await query;
     if (error) throw error;
+
+    // Fetch user's connections to check connectivity in discovery
+    const { data: userConns } = await supabase
+      .from('connections')
+      .or(`shop_owner_id.eq.${req.user.id},wholesaler_id.eq.${req.user.id}`);
+
+    const connectedSet = new Set();
+    (userConns || []).forEach(c => {
+      connectedSet.add(c.shop_owner_id === req.user.id ? c.wholesaler_id : c.shop_owner_id);
+    });
 
     // Post-process and filter in memory
     let profiles = [];
@@ -163,11 +191,19 @@ const discoverProfiles = async (req, res, next) => {
         return;
       }
 
-      // Location filter (check user's address or product's location)
+      // Location text filter (check user's address or product's location)
       if (locationLower) {
         const addressMatch = user.address?.toLowerCase().includes(locationLower);
         const productLocationMatch = products.some(p => p.location?.toLowerCase().includes(locationLower));
         if (!addressMatch && !productLocationMatch) {
+          return;
+        }
+      }
+
+      // City filter — use address/location_name since users table has no city column
+      if (city) {
+        const userLocation = (user.location_name || user.address || '').toLowerCase();
+        if (!userLocation.includes(city.toLowerCase())) {
           return;
         }
       }
@@ -178,10 +214,20 @@ const discoverProfiles = async (req, res, next) => {
         req.user?.latitude && req.user?.longitude &&
         user.latitude && user.longitude
       ) {
-        distance = haversine(
-          req.user.latitude, req.user.longitude,
-          user.latitude, user.longitude
+        distance = getDistanceKm(
+          parseFloat(req.user.latitude),
+          parseFloat(req.user.longitude),
+          parseFloat(user.latitude),
+          parseFloat(user.longitude)
         );
+      }
+
+      // Max Distance filter
+      if (maxDistance) {
+        const maxD = parseFloat(maxDistance);
+        if (distance === null || distance > maxD) {
+          return;
+        }
       }
 
       // Calculate price ranges & aggregates
@@ -194,12 +240,16 @@ const discoverProfiles = async (req, res, next) => {
 
       profiles.push({
         id: user.id,
+        name: user.shop_name,
         shop_name: user.shop_name,
         role: user.role,
         latitude: user.latitude,
         longitude: user.longitude,
         address: user.address,
+        city: null,
+        state: null,
         is_profile_complete: user.is_profile_complete,
+        isConnected: connectedSet.has(user.id),
         total_products: products.length,
         min_price: minPriceVal === Infinity ? 0 : minPriceVal,
         max_price: maxPriceVal === -Infinity ? 0 : maxPriceVal,
@@ -211,12 +261,15 @@ const discoverProfiles = async (req, res, next) => {
           latitude: user.latitude,
           longitude: user.longitude,
           address: user.address,
+          city: null,
+          state: null,
           is_profile_complete: user.is_profile_complete,
         },
         productCount: products.length,
         minPrice: minPriceVal === Infinity ? 0 : minPriceVal,
         maxPrice: maxPriceVal === -Infinity ? 0 : maxPriceVal,
         distance: distance !== null ? Math.round(distance * 10) / 10 : null,
+        distance_km: distance !== null ? Math.round(distance * 10) / 10 : null,
         topProducts: [...products]
           .sort((a, b) => a.price_per_unit - b.price_per_unit)
           .slice(0, 3)
@@ -227,26 +280,26 @@ const discoverProfiles = async (req, res, next) => {
     // Sort
     if (sortBy === 'nearest') {
       profiles.sort((a, b) => {
-        if (a.distance === null) return 1;
-        if (b.distance === null) return -1;
-        return a.distance - b.distance;
+        if (a.distance_km === null) return 1;
+        if (b.distance_km === null) return -1;
+        return a.distance_km - b.distance_km;
       });
     } else if (sortBy === 'lowest_price') {
       profiles.sort((a, b) => a.minPrice - b.minPrice);
     } else if (sortBy === 'recommended') {
-      const distances = profiles.map(p => p.distance).filter(d => d !== null);
+      const distances = profiles.map(p => p.distance_km).filter(d => d !== null);
       const maxDist = distances.length > 0 ? Math.max(...distances, 1) : 1;
       const counts = profiles.map(p => p.productCount);
       const maxCount = counts.length > 0 ? Math.max(...counts, 1) : 1;
 
       profiles.forEach(p => {
-        const distScore = p.distance !== null ? p.distance / maxDist : 0.5;
+        const distScore = p.distance_km !== null ? p.distance_km / maxDist : 0.5;
         const countScore = maxCount > 0 ? 1 - p.productCount / maxCount : 0.5;
         p._score = 0.6 * distScore + 0.4 * countScore;
       });
       profiles.sort((a, b) => a._score - b._score);
     } else {
-      profiles.sort((a, b) => (a.wholesaler?.shop_name || '').localeCompare(b.wholesaler?.shop_name || ''));
+      profiles.sort((a, b) => (a.shop_name || '').localeCompare(b.shop_name || ''));
     }
 
     const from = (parseInt(page) - 1) * parseInt(limit);
@@ -284,6 +337,16 @@ const getRecommended = async (req, res, next) => {
     const { data: users, error } = await query;
     if (error) throw error;
 
+    // Fetch user's connections for recommended suppliers
+    const { data: userConns } = await supabase
+      .from('connections')
+      .or(`user_id.eq.${req.user.id},connected_user_id.eq.${req.user.id}`);
+
+    const connectedSet = new Set();
+    (userConns || []).forEach(c => {
+      connectedSet.add(c.user_id === req.user.id ? c.connected_user_id : c.user_id);
+    });
+
     let profiles = [];
 
     (users || []).forEach(user => {
@@ -295,9 +358,11 @@ const getRecommended = async (req, res, next) => {
         req.user?.latitude && req.user?.longitude &&
         user.latitude && user.longitude
       ) {
-        distance = haversine(
-          req.user.latitude, req.user.longitude,
-          user.latitude, user.longitude
+        distance = getDistanceKm(
+          parseFloat(req.user.latitude),
+          parseFloat(req.user.longitude),
+          parseFloat(user.latitude),
+          parseFloat(user.longitude)
         );
       }
 
@@ -311,15 +376,19 @@ const getRecommended = async (req, res, next) => {
 
       profiles.push({
         id: user.id,
+        name: user.shop_name,
         shop_name: user.shop_name,
         role: user.role,
         latitude: user.latitude,
         longitude: user.longitude,
         address: user.address,
+        city: user.city,
+        state: user.state,
         is_profile_complete: user.is_profile_complete,
         total_products: products.length,
         min_price: minPriceVal === Infinity ? 0 : minPriceVal,
         max_price: maxPriceVal === -Infinity ? 0 : maxPriceVal,
+        isConnected: connectedSet.has(user.id),
         // Backward compatibility:
         wholesaler: {
           id: user.id,
@@ -328,12 +397,15 @@ const getRecommended = async (req, res, next) => {
           latitude: user.latitude,
           longitude: user.longitude,
           address: user.address,
+          city: user.city,
+          state: user.state,
           is_profile_complete: user.is_profile_complete,
         },
         productCount: products.length,
         minPrice: minPriceVal === Infinity ? 0 : minPriceVal,
         maxPrice: maxPriceVal === -Infinity ? 0 : maxPriceVal,
         distance: distance !== null ? Math.round(distance * 10) / 10 : null,
+        distance_km: distance !== null ? Math.round(distance * 10) / 10 : null,
         topProducts: [...products]
           .sort((a, b) => a.price_per_unit - b.price_per_unit)
           .slice(0, 3)
@@ -341,13 +413,13 @@ const getRecommended = async (req, res, next) => {
       });
     });
 
-    const distances = profiles.map(p => p.distance).filter(d => d !== null);
+    const distances = profiles.map(p => p.distance_km).filter(d => d !== null);
     const maxDist = distances.length > 0 ? Math.max(...distances, 1) : 1;
     const counts = profiles.map(p => p.productCount);
     const maxCount = counts.length > 0 ? Math.max(...counts, 1) : 1;
 
     profiles.forEach(p => {
-      const distScore = p.distance !== null ? p.distance / maxDist : 0.5;
+      const distScore = p.distance_km !== null ? p.distance_km / maxDist : 0.5;
       const countScore = maxCount > 0 ? 1 - p.productCount / maxCount : 0.5;
       p._score = 0.6 * distScore + 0.4 * countScore;
     });
@@ -418,19 +490,48 @@ const getSellerProfile = async (req, res, next) => {
   try {
     const { userId } = req.params;
 
-    const [{ data: seller, error: sErr }, { data: listings, error: lErr }] = await Promise.all([
+    const [{ data: seller, error: sErr }, { data: listings, error: lErr }, { data: conn }] = await Promise.all([
       supabase.from('users')
-        .select('id, shop_name, role, latitude, longitude, address, created_at')
+        .select('id, shop_name, role, latitude, longitude, address, city, state, created_at')
         .eq('id', userId).single(),
       supabase.from('wholesaler_products')
         .select('*').eq('wholesaler_id', userId)
         .gt('stock_available', 0).order('price_per_unit', { ascending: true }),
+      supabase.from('connections')
+        .or(`user_id.eq.${req.user.id},connected_user_id.eq.${req.user.id}`)
     ]);
 
     if (sErr || !seller) return res.status(404).json({ message: 'User not found' });
     if (lErr) throw lErr;
 
-    res.json({ seller, listings: listings || [] });
+    const isConnected = (conn || []).some(c => 
+      (c.user_id === req.user.id && c.connected_user_id === userId) ||
+      (c.user_id === userId && c.connected_user_id === req.user.id)
+    );
+
+    res.json({ seller: { ...seller, isConnected }, listings: listings || [] });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc  Reverse geocode coordinates using location service
+ * @route POST /api/profile/reverse-geocode
+ * body: { latitude, longitude }
+ */
+const reverseGeocode = async (req, res, next) => {
+  try {
+    // Accept both { lat, lng } and { latitude, longitude }
+    const lat = req.body.lat ?? req.body.latitude;
+    const lng = req.body.lng ?? req.body.longitude;
+
+    if (lat === undefined || lng === undefined) {
+      return res.status(400).json({ message: 'lat/lng (or latitude/longitude) are required' });
+    }
+
+    const result = await locationService.reverseGeocode(parseFloat(lat), parseFloat(lng));
+    res.json(result);
   } catch (error) {
     next(error);
   }
@@ -443,4 +544,5 @@ module.exports = {
   getRecommended,
   getTrending,
   getSellerProfile,
+  reverseGeocode,
 };

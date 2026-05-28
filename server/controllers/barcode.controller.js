@@ -13,23 +13,7 @@ const lookupProduct = async (req, res, next) => {
       return res.status(400).json({ message: 'Barcode is required' });
     }
 
-    // Check user's own inventory first
-    const { data: existing } = await supabase
-      .from('products')
-      .select('*, categories(name, icon)')
-      .eq('user_id', req.user.id)
-      .eq('barcode', barcode)
-      .maybeSingle();
-
-    if (existing) {
-      return res.json({
-        found:   true,
-        source:  'inventory',
-        product: existing,
-      });
-    }
-
-    // Fall back to external barcode API
+    // barcode column removed from products table — fall through to external API
     const apiData = await lookupBarcode(barcode);
 
     if (apiData) {
@@ -48,12 +32,11 @@ const lookupProduct = async (req, res, next) => {
  */
 const recordScan = async (req, res, next) => {
   try {
-    const { barcode, productId, action } = req.body;
+    const { productId, action } = req.body;
 
     const { error } = await supabase.from('scan_history').insert({
       user_id:    req.user.id,
       product_id: productId || null,
-      barcode:    barcode   || null,
       action:     action    || 'view',
     });
 

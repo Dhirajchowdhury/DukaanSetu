@@ -3,9 +3,12 @@ const { supabase } = require('../config/db');
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 /** Compute virtual fields that Mongoose used to provide */
-const withVirtuals = (product, threshold = 10) => {
+const withVirtuals = (product, defaultThreshold = 10) => {
   const now = new Date();
   const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const threshold = product.low_stock_threshold !== undefined && product.low_stock_threshold !== null
+    ? product.low_stock_threshold
+    : defaultThreshold;
   return {
     ...product,
     // Flatten nested category join → match old Mongoose populate shape
@@ -17,16 +20,17 @@ const withVirtuals = (product, threshold = 10) => {
       ? new Date(product.expiry_date) <= sevenDays && new Date(product.expiry_date) > now
       : false,
     // camelCase aliases for frontend compatibility
-    productName:     product.product_name,
-    batchNumber:     product.batch_number,
-    expiryDate:      product.expiry_date,
-    manufactureDate: product.manufacture_date,
-    costPrice:       product.cost_price,
-    sellingPrice:    product.selling_price,
-    lastRestockDate: product.last_restock_date,
-    imageUrl:        product.image_url,
-    createdAt:       product.created_at,
-    updatedAt:       product.updated_at,
+    productName:          product.product_name,
+    batchNumber:          product.batch_number,
+    expiryDate:           product.expiry_date,
+    manufactureDate:      product.manufacture_date,
+    costPrice:            product.cost_price,
+    sellingPrice:         product.selling_price,
+    minimumOrderQuantity: product.minimum_order_quantity,
+    lastRestockDate:      product.last_restock_date,
+    imageUrl:             product.image_url,
+    createdAt:            product.created_at,
+    updatedAt:            product.updated_at,
   };
 };
 
@@ -72,10 +76,10 @@ const getProducts = async (req, res, next) => {
       .order(col, { ascending })
       .range(from, to);
 
-    // Search (product_name OR brand OR barcode)
+    // Search (product_name OR brand)
     if (search) {
       query = query.or(
-        `product_name.ilike.%${search}%,brand.ilike.%${search}%,barcode.ilike.%${search}%`
+        `product_name.ilike.%${search}%,brand.ilike.%${search}%`
       );
     }
 
@@ -88,6 +92,7 @@ const getProducts = async (req, res, next) => {
     if (stockLevel === 'out') {
       query = query.eq('quantity', 0);
     } else if (stockLevel === 'low') {
+      // Use the user's configured threshold as a numeric value
       query = query.lte('quantity', threshold).gt('quantity', 0);
     }
 
@@ -148,18 +153,18 @@ const getProduct = async (req, res, next) => {
 const createProduct = async (req, res, next) => {
   try {
     const {
-      productName, categoryId, barcode, brand, batchNumber,
+      productName, categoryId, brand, batchNumber,
       expiryDate, manufactureDate, quantity, unit,
       costPrice, sellingPrice, supplier, imageUrl,
+      minimumOrderQuantity,
     } = req.body;
 
     const { data: product, error } = await supabase
       .from('products')
       .insert({
-        user_id:          req.user.id,
-        category_id:      categoryId,
-        product_name:     productName,
-        barcode:          barcode   || null,
+        user_id:                  req.user.id,
+        category_id:              categoryId,
+        product_name:             productName,
         brand:            brand     || null,
         batch_number:     batchNumber || null,
         expiry_date:      expiryDate  || null,
@@ -169,22 +174,13 @@ const createProduct = async (req, res, next) => {
         cost_price:       costPrice    || null,
         selling_price:    sellingPrice || null,
         supplier:         supplier  || null,
+        minimum_order_quantity:   minimumOrderQuantity != null ? Number(minimumOrderQuantity) : null,
         image_url:        imageUrl  || null,
       })
       .select('*, categories(name, icon)')
       .single();
 
     if (error) throw error;
-
-    // Record scan history if barcode provided
-    if (barcode) {
-      await supabase.from('scan_history').insert({
-        user_id:    req.user.id,
-        product_id: product.id,
-        barcode,
-        action:     'add',
-      });
-    }
 
     const threshold = req.user.preferences?.lowStockThreshold ?? 10;
     res.status(201).json({
@@ -203,26 +199,27 @@ const createProduct = async (req, res, next) => {
 const updateProduct = async (req, res, next) => {
   try {
     const {
-      productName, categoryId, barcode, brand, batchNumber,
+      productName, categoryId, brand, batchNumber,
       expiryDate, manufactureDate, quantity, unit,
       costPrice, sellingPrice, supplier, imageUrl,
+      minimumOrderQuantity,
     } = req.body;
 
     // Build update object — only include defined fields
     const updates = {};
-    if (productName     !== undefined) updates.product_name     = productName;
-    if (categoryId      !== undefined) updates.category_id      = categoryId;
-    if (barcode         !== undefined) updates.barcode          = barcode;
-    if (brand           !== undefined) updates.brand            = brand;
-    if (batchNumber     !== undefined) updates.batch_number     = batchNumber;
-    if (expiryDate      !== undefined) updates.expiry_date      = expiryDate || null;
-    if (manufactureDate !== undefined) updates.manufacture_date = manufactureDate || null;
-    if (quantity        !== undefined) updates.quantity         = quantity;
-    if (unit            !== undefined) updates.unit             = unit;
-    if (costPrice       !== undefined) updates.cost_price       = costPrice;
-    if (sellingPrice    !== undefined) updates.selling_price    = sellingPrice;
-    if (supplier        !== undefined) updates.supplier         = supplier;
-    if (imageUrl        !== undefined) updates.image_url        = imageUrl;
+    if (productName          !== undefined) updates.product_name            = productName;
+    if (categoryId           !== undefined) updates.category_id             = categoryId;
+    if (brand                !== undefined) updates.brand                   = brand;
+    if (batchNumber          !== undefined) updates.batch_number            = batchNumber;
+    if (expiryDate           !== undefined) updates.expiry_date             = expiryDate || null;
+    if (manufactureDate      !== undefined) updates.manufacture_date        = manufactureDate || null;
+    if (quantity             !== undefined) updates.quantity                = quantity;
+    if (unit                 !== undefined) updates.unit                    = unit;
+    if (costPrice            !== undefined) updates.cost_price              = costPrice;
+    if (sellingPrice         !== undefined) updates.selling_price           = sellingPrice;
+    if (supplier             !== undefined) updates.supplier                = supplier;
+    if (minimumOrderQuantity !== undefined) updates.minimum_order_quantity  = minimumOrderQuantity !== '' ? Number(minimumOrderQuantity) : null;
+    if (imageUrl             !== undefined) updates.image_url               = imageUrl;
 
     const { data: product, error } = await supabase
       .from('products')
@@ -234,16 +231,6 @@ const updateProduct = async (req, res, next) => {
 
     if (error || !product) {
       return res.status(404).json({ message: 'Product not found' });
-    }
-
-    // Record scan history
-    if (product.barcode) {
-      await supabase.from('scan_history').insert({
-        user_id:    req.user.id,
-        product_id: product.id,
-        barcode:    product.barcode,
-        action:     'update',
-      });
     }
 
     const threshold = req.user.preferences?.lowStockThreshold ?? 10;

@@ -1,7 +1,7 @@
 const { supabase } = require('../config/db');
 
 /**
- * @desc  Get user's connections (both pending and accepted)
+ * @desc  Get user's connections (instantly B2B bidirectional)
  * @route GET /api/connections
  */
 const getConnections = async (req, res, next) => {
@@ -9,22 +9,20 @@ const getConnections = async (req, res, next) => {
     const { data: conns, error } = await supabase
       .from('connections')
       .select(`
-        id, status, initiator_id, created_at,
-        shop_owner:users!shop_owner_id(id, shop_name, role, latitude, longitude, address, email),
-        wholesaler:users!wholesaler_id(id, shop_name, role, latitude, longitude, address, email)
+        id, created_at,
+        user:users!user_id(id, shop_name, role, latitude, longitude, address, email),
+        connected_user:users!connected_user_id(id, shop_name, role, latitude, longitude, address, email)
       `)
-      .or(`shop_owner_id.eq.${req.user.id},wholesaler_id.eq.${req.user.id}`)
+      .or(`user_id.eq.${req.user.id},connected_user_id.eq.${req.user.id}`)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
     const enriched = (conns || []).map(c => {
-      const isShopOwner = c.shop_owner.id === req.user.id;
-      const otherUser = isShopOwner ? c.wholesaler : c.shop_owner;
+      const isUser = c.user.id === req.user.id;
+      const otherUser = isUser ? c.connected_user : c.user;
       return {
         id: c.id,
-        status: c.status,
-        initiatorId: c.initiator_id,
         createdAt: c.created_at,
         otherUser
       };
@@ -37,52 +35,64 @@ const getConnections = async (req, res, next) => {
 };
 
 /**
- * @desc  Update connection status (accept/reject)
- * @route PUT /api/connections/:id
- * body: { status: 'accepted' | 'rejected' }
+ * @desc  Instantly create connection (B2B LinkedIn-style, zero friction)
+ * @route POST /api/connections/:userId
  */
-const updateConnectionStatus = async (req, res, next) => {
+const createConnection = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { status } = req.body;
+    const { userId } = req.params;
 
-    if (!['accepted', 'rejected'].includes(status)) {
-      return res.status(400).json({ message: 'Invalid status. Must be accepted or rejected.' });
+    if (!userId) {
+      return res.status(400).json({ message: 'Target userId is required' });
     }
 
-    // Fetch connection details
-    const { data: conn, error: findErr } = await supabase
-      .from('connections')
-      .select('id, shop_owner_id, wholesaler_id, initiator_id')
-      .eq('id', id)
+    if (userId === req.user.id) {
+      return res.status(400).json({ message: 'You cannot connect with yourself' });
+    }
+
+    // Verify other user exists
+    const { data: otherUser, error: otherErr } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
       .maybeSingle();
 
-    if (findErr || !conn) {
-      return res.status(404).json({ message: 'Connection request not found' });
+    if (otherErr || !otherUser) {
+      return res.status(404).json({ message: 'Target user not found' });
     }
 
-    // Verify membership
-    if (conn.shop_owner_id !== req.user.id && conn.wholesaler_id !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to update this connection' });
-    }
+    // Sort IDs to ensure bidirectionality and store once
+    const [u1, u2] = [req.user.id, userId].sort();
 
-    // Check if the current user is the initiator
-    if (conn.initiator_id === req.user.id) {
-      return res.status(400).json({ message: 'You cannot approve or reject your own connection request' });
-    }
-
-    const { data: updated, error: updateErr } = await supabase
+    // Check if duplicate connection exists
+    const { data: existing, error: findErr } = await supabase
       .from('connections')
-      .update({ status })
-      .eq('id', id)
+      .select('id')
+      .eq('user_id', u1)
+      .eq('connected_user_id', u2)
+      .maybeSingle();
+
+    if (findErr) throw findErr;
+
+    if (existing) {
+      return res.status(400).json({ message: 'You are already connected with this user' });
+    }
+
+    // Create the connection instantly (no accept/reject)
+    const { data: connection, error: insertErr } = await supabase
+      .from('connections')
+      .insert({
+        user_id: u1,
+        connected_user_id: u2
+      })
       .select()
       .single();
 
-    if (updateErr) throw updateErr;
+    if (insertErr) throw insertErr;
 
-    res.json({
-      message: `Connection request ${status === 'accepted' ? 'accepted' : 'rejected'} successfully`,
-      connection: updated
+    res.status(201).json({
+      message: 'Successfully connected',
+      connection
     });
   } catch (error) {
     next(error);
@@ -91,5 +101,5 @@ const updateConnectionStatus = async (req, res, next) => {
 
 module.exports = {
   getConnections,
-  updateConnectionStatus
+  createConnection
 };

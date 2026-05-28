@@ -1,0 +1,199 @@
+/* ============================================================
+   DukaanSetu — B2B Connections Page Styles
+   ============================================================ */
+
+.connections-page-main {
+  padding: 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: calc(100vh - 80px);
+  background: var(--surface-2);
+}
+
+.connections-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  gap: 24px;
+}
+
+@media (max-width: 640px) {
+  .connections-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.connections-title {
+  font-size: 28px;
+  font-weight: 850;
+  color: var(--text);
+  letter-spacing: -0.025em;
+  margin: 0 0 6px 0;
+}
+
+.connections-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.connections-browse-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Loading Center */
+.connections-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 0;
+  color: var(--text-muted);
+}
+
+.connections-loading p {
+  margin-top: 16px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Empty State */
+.connections-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 64px 32px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Connections Grid */
+.connections-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+/* Connection Card */
+.connection-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: all var(--transition-slow);
+  position: relative;
+  overflow: hidden;
+}
+
+.connection-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary-muted);
+}
+
+.connection-card-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--primary-light), #e0e7ff);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.connection-card-content {
+  flex: 1;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.connection-card-name {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text);
+  margin: 0 0 6px 0;
+  line-clamp: 1;
+}
+
+.connection-card-role {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 10px;
+  margin-bottom: 12px;
+}
+
+.connection-card-location {
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.connection-card-location span {
+  font-weight: 500;
+}
+
+/* Connection Card Actions */
+.connection-card-actions {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 8px;
+}
+
+.connection-card-actions .btn {
+  width: 100%;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+/* Disabled Map Button */
+.disabled-map-btn {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--surface-2) !important;
+  color: var(--text-muted) !important;
+  border-color: var(--border) !important;
+}
+
+.disabled-map-btn:hover {
+  background: var(--surface-2) !important;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

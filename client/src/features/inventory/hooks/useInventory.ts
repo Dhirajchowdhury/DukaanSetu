@@ -49,7 +49,7 @@ export function useInventory() {
         price: p.sellingPrice || 0,
         expiryDate: p.expiryDate,
         status: p.quantity <= 0 ? 'Out of Stock' : p.isLowStock ? 'Low Stock' : 'In Stock',
-        sku: p.barcode || 'N/A',
+        sku: p.id?.slice(-8)?.toUpperCase() || 'N/A',
         lastUpdated: p.updatedAt,
       }));
 

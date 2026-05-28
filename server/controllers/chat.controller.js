@@ -29,9 +29,8 @@ const getOrCreateConversation = async (userA, userB) => {
 };
 
 /**
- * @desc  Get or create conversation with another user
- * @route POST /api/chat/conversations
- * body: { otherUserId }
+ * @desc  Get or create conversation with another user (Connection enforced)
+ * @route POST /api/conversations
  */
 const startConversation = async (req, res, next) => {
   try {
@@ -39,58 +38,19 @@ const startConversation = async (req, res, next) => {
     if (!otherUserId) return res.status(400).json({ message: 'otherUserId is required' });
     if (otherUserId === req.user.id) return res.status(400).json({ message: 'Cannot chat with yourself' });
 
-    let connObj = null;
+    // Verify connection exists before allowing chat initialization
+    const [u1, u2] = [req.user.id, otherUserId].sort();
+    const { data: conn, error: connErr } = await supabase
+      .from('connections')
+      .select('id')
+      .eq('user_id', u1)
+      .eq('connected_user_id', u2)
+      .maybeSingle();
 
-    // ── CONNECTION SYSTEM INTEGRATION ──
-    const { data: otherUser } = await supabase
-      .from('users')
-      .select('id, role')
-      .eq('id', otherUserId)
-      .single();
-
-    if (otherUser) {
-      let shop_owner_id = null;
-      let wholesaler_id = null;
-
-      if (req.user.role === 'shop_owner') {
-        shop_owner_id = req.user.id;
-        wholesaler_id = otherUserId;
-      } else if (otherUser.role === 'shop_owner') {
-        shop_owner_id = otherUserId;
-        wholesaler_id = req.user.id;
-      } else {
-        const sorted = [req.user.id, otherUserId].sort();
-        shop_owner_id = sorted[0];
-        wholesaler_id = sorted[1];
-      }
-
-      // Check if connection exists
-      const { data: existingConn } = await supabase
-        .from('connections')
-        .select('id, status, initiator_id')
-        .eq('shop_owner_id', shop_owner_id)
-        .eq('wholesaler_id', wholesaler_id)
-        .maybeSingle();
-
-      connObj = existingConn;
-
-      if (!existingConn) {
-        const { data: newConn, error: connErr } = await supabase
-          .from('connections')
-          .insert({
-            shop_owner_id,
-            wholesaler_id,
-            status: 'pending',
-            initiator_id: req.user.id
-          })
-          .select('id, status, initiator_id')
-          .single();
-        if (!connErr) {
-          connObj = newConn;
-        }
-      }
+    if (connErr) throw connErr;
+    if (!conn) {
+      return res.status(403).json({ message: 'You can only message users you are connected with.' });
     }
-    // ── END CONNECTION INTEGRATION ──
 
     const conversationId = await getOrCreateConversation(req.user.id, otherUserId);
 
@@ -99,27 +59,23 @@ const startConversation = async (req, res, next) => {
       .from('conversations')
       .select(`
         id, created_at,
-        user1:users!conversations_user1_id_fkey(id, shop_name, role),
-        user2:users!conversations_user2_id_fkey(id, shop_name, role)
+        user1:users!user1_id(id, shop_name, role, latitude, longitude, address, email),
+        user2:users!user2_id(id, shop_name, role, latitude, longitude, address, email)
       `)
       .eq('id', conversationId)
       .single();
 
     if (error) throw error;
-    res.json({
-      conversation: {
-        ...conv,
-        connection: connObj
-      }
-    });
+
+    res.json({ conversation: conv });
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * @desc  List all conversations for current user
- * @route GET /api/chat/conversations
+ * @desc  List all conversations for current user (only when active connection exists)
+ * @route GET /api/conversations
  */
 const getConversations = async (req, res, next) => {
   try {
@@ -127,31 +83,39 @@ const getConversations = async (req, res, next) => {
       .from('conversations')
       .select(`
         id, created_at,
-        user1:users!conversations_user1_id_fkey(id, shop_name, role),
-        user2:users!conversations_user2_id_fkey(id, shop_name, role)
+        user1:users!user1_id(id, shop_name, role, latitude, longitude, address, email),
+        user2:users!user2_id(id, shop_name, role, latitude, longitude, address, email)
       `)
       .or(`user1_id.eq.${req.user.id},user2_id.eq.${req.user.id}`)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
+    // Get active connections for current user to filter conversations
     const { data: conns } = await supabase
       .from('connections')
-      .or(`shop_owner_id.eq.${req.user.id},wholesaler_id.eq.${req.user.id}`);
+      .or(`user_id.eq.${req.user.id},connected_user_id.eq.${req.user.id}`);
 
-    const connMap = {};
+    const connectedSet = new Set();
     (conns || []).forEach(c => {
-      const key = [c.shop_owner_id, c.wholesaler_id].sort().join('_');
-      connMap[key] = { id: c.id, status: c.status, initiator_id: c.initiator_id };
+      connectedSet.add(c.user_id === req.user.id ? c.connected_user_id : c.user_id);
     });
 
-    const enriched = (data || []).map(conv => {
-      const key = [conv.user1.id, conv.user2.id].sort().join('_');
-      return {
-        ...conv,
-        connection: connMap[key] || null
-      };
-    });
+    const enriched = (data || [])
+      .filter(conv => {
+        const otherId = conv.user1.id === req.user.id ? conv.user2.id : conv.user1.id;
+        return connectedSet.has(otherId);
+      })
+      .map(conv => {
+        const partner = conv.user1.id === req.user.id ? conv.user2 : conv.user1;
+        return {
+          id: conv.id,
+          createdAt: conv.created_at,
+          user1: conv.user1,
+          user2: conv.user2,
+          partner
+        };
+      });
 
     res.json({ conversations: enriched });
   } catch (error) {
@@ -161,17 +125,17 @@ const getConversations = async (req, res, next) => {
 
 /**
  * @desc  Get messages in a conversation
- * @route GET /api/chat/conversations/:id/messages
+ * @route GET /api/messages/:conversationId
  */
 const getMessages = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { conversationId } = req.params;
 
     // Verify user is part of this conversation
     const { data: conv } = await supabase
       .from('conversations')
       .select('id, user1_id, user2_id')
-      .eq('id', id)
+      .eq('id', conversationId)
       .maybeSingle();
 
     if (!conv) return res.status(404).json({ message: 'Conversation not found' });
@@ -179,10 +143,25 @@ const getMessages = async (req, res, next) => {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
+    const otherUserId = conv.user1_id === req.user.id ? conv.user2_id : conv.user1_id;
+
+    // Enforce connection check
+    const [u1, u2] = [req.user.id, otherUserId].sort();
+    const { data: conn } = await supabase
+      .from('connections')
+      .select('id')
+      .eq('user_id', u1)
+      .eq('connected_user_id', u2)
+      .maybeSingle();
+
+    if (!conn) {
+      return res.status(403).json({ message: 'You can only view messages of users you are connected with.' });
+    }
+
     const { data: messages, error } = await supabase
       .from('messages')
-      .select('id, message, sender_id, created_at')
-      .eq('conversation_id', id)
+      .select('id, text, sender_id, created_at')
+      .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true });
 
     if (error) throw error;
@@ -193,87 +172,64 @@ const getMessages = async (req, res, next) => {
 };
 
 /**
- * @desc  Send a message
- * @route POST /api/chat/conversations/:id/messages
- * body: { message }
+ * @desc  Send a message (connection gated)
+ * @route POST /api/messages
+ * body: { conversationId, otherUserId, text }
  */
 const sendMessage = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { message } = req.body;
+    const { conversationId, otherUserId, text } = req.body;
+    let targetConvId = conversationId;
 
-    if (!message?.trim()) return res.status(400).json({ message: 'Message cannot be empty' });
+    const messageText = text || req.body.message;
+    if (!messageText?.trim()) return res.status(400).json({ message: 'Message cannot be empty' });
 
-    // Verify membership
-    const { data: conv } = await supabase
-      .from('conversations')
-      .select('id, user1_id, user2_id')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (!conv) return res.status(404).json({ message: 'Conversation not found' });
-    if (conv.user1_id !== req.user.id && conv.user2_id !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized' });
+    if (!targetConvId && !otherUserId) {
+      return res.status(400).json({ message: 'conversationId or otherUserId is required' });
     }
 
-    // Check connection status
-    const otherUserId = conv.user1_id === req.user.id ? conv.user2_id : conv.user1_id;
-    const { data: otherUser } = await supabase
-      .from('users')
-      .select('id, role')
-      .eq('id', otherUserId)
-      .single();
+    let otherId = otherUserId;
 
-    let shop_owner_id = null;
-    let wholesaler_id = null;
-    if (req.user.role === 'shop_owner') {
-      shop_owner_id = req.user.id;
-      wholesaler_id = otherUserId;
-    } else if (otherUser?.role === 'shop_owner') {
-      shop_owner_id = otherUserId;
-      wholesaler_id = req.user.id;
-    } else {
-      const sorted = [req.user.id, otherUserId].sort();
-      shop_owner_id = sorted[0];
-      wholesaler_id = sorted[1];
+    if (targetConvId) {
+      const { data: conv } = await supabase
+        .from('conversations')
+        .select('id, user1_id, user2_id')
+        .eq('id', targetConvId)
+        .maybeSingle();
+
+      if (!conv) return res.status(404).json({ message: 'Conversation not found' });
+      if (conv.user1_id !== req.user.id && conv.user2_id !== req.user.id) {
+        return res.status(403).json({ message: 'Not authorized' });
+      }
+      otherId = conv.user1_id === req.user.id ? conv.user2_id : conv.user1_id;
     }
 
+    // Verify connection exists between users
+    const [u1, u2] = [req.user.id, otherId].sort();
     const { data: conn } = await supabase
       .from('connections')
-      .select('id, status, initiator_id')
-      .eq('shop_owner_id', shop_owner_id)
-      .eq('wholesaler_id', wholesaler_id)
+      .select('id')
+      .eq('user_id', u1)
+      .eq('connected_user_id', u2)
       .maybeSingle();
 
-    let connObj = conn;
     if (!conn) {
-      const { data: newConn } = await supabase
-        .from('connections')
-        .insert({
-          shop_owner_id,
-          wholesaler_id,
-          status: 'pending',
-          initiator_id: req.user.id
-        })
-        .select('id, status, initiator_id')
-        .single();
-      connObj = newConn;
+      return res.status(403).json({ message: 'You can only message users you are connected with.' });
     }
 
-    if (connObj && connObj.status === 'rejected') {
-      return res.status(403).json({
-        message: 'Connection request was rejected'
-      });
+    if (!targetConvId) {
+      // Auto-create conversation if it doesn't exist
+      targetConvId = await getOrCreateConversation(req.user.id, otherId);
     }
 
     const { data: msg, error } = await supabase
       .from('messages')
       .insert({
-        conversation_id: id,
+        conversation_id: targetConvId,
         sender_id:       req.user.id,
-        message:         message.trim(),
+        text:            messageText.trim(),
       })
-      .select('id, message, sender_id, created_at')
+      .select('id, text, sender_id, created_at')
       .single();
 
     if (error) throw error;

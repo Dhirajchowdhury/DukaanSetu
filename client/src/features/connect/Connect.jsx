@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { 
   FiSearch, FiMapPin, FiPackage, FiShoppingCart, FiMessageSquare, 
   FiCompass, FiNavigation, FiMap, FiUser, FiSend, FiX, 
-  FiChevronRight, FiInfo, FiArrowLeft, FiClock, FiMaximize
+  FiChevronRight, FiInfo, FiArrowLeft, FiClock, FiMaximize, FiCheck
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import './Connect.css';
@@ -14,6 +14,7 @@ const ConnectFeature = () => {
   const { user, checkAuth } = useAuth();
   const { id: routeSellerId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Tabs: 'marketplace' | 'discovery' | 'connections' | 'chat'
   const [activeTab, setActiveTab] = useState('discovery');
@@ -23,6 +24,8 @@ const ConnectFeature = () => {
   const [address, setAddress] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
+  const [city, setCity] = useState('');
+  const [stateVal, setStateVal] = useState('');
   const [detectingLoc, setDetectingLoc] = useState(false);
   const [savingLoc, setSavingLoc] = useState(false);
 
@@ -40,6 +43,7 @@ const ConnectFeature = () => {
   const [dMinPrice, setDMinPrice] = useState('');
   const [dMaxPrice, setDMaxPrice] = useState('');
   const [dSortBy, setDSortBy] = useState('nearest'); // 'nearest' | 'lowest_price' | ''
+  const [dMaxDistance, setDMaxDistance] = useState(''); // '' | '5' | '10'
   const [dPage, setDPage] = useState(1);
   const [dPages, setDPages] = useState(1);
 
@@ -75,6 +79,9 @@ const ConnectFeature = () => {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const chatEndRef = useRef(null);
 
+  // Connect Loading state
+  const [connectingUsers, setConnectingUsers] = useState({});
+
   // Inquiry Modal states
   const [showInquiryModal, setShowInquiryModal] = useState(false);
   const [selectedInquiryProduct, setSelectedInquiryProduct] = useState(null);
@@ -82,10 +89,31 @@ const ConnectFeature = () => {
   const [inquiryMsg, setInquiryMsg] = useState('');
   const [sendingInquiry, setSendingInquiry] = useState(false);
 
+  // Order Modal states
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [selectedOrderProduct, setSelectedOrderProduct] = useState(null);
+  const [orderQty, setOrderQty] = useState(1);
+  const [orderDeliveryLocation, setOrderDeliveryLocation] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
+  const [placingOrder, setPlacingOrder] = useState(false);
+
   // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Sync routing and state (for redirection from connections/orders pages)
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+      if (location.state.activeConv) {
+        setActiveConv(location.state.activeConv);
+        fetchMessages(location.state.activeConv.id, true);
+      }
+      // Clean up state on navigation history so it doesn't loop
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location]);
 
   // 1. Initialise and load tab data
   useEffect(() => {
@@ -100,7 +128,7 @@ const ConnectFeature = () => {
     } else if (activeTab === 'connections') {
       fetchConnections();
     }
-  }, [activeTab, dSearch, dLocation, dRole, dMinPrice, dMaxPrice, dSortBy, dPage, selectedSellerId]);
+  }, [activeTab, dSearch, dLocation, dRole, dMinPrice, dMaxPrice, dSortBy, dPage, dMaxDistance, selectedSellerId]);
 
   // Chat Polling Interval
   useEffect(() => {
@@ -159,12 +187,22 @@ const ConnectFeature = () => {
         setLatitude(lat.toFixed(6));
         setLongitude(lng.toFixed(6));
         
-        toast.success('Coordinates detected successfully!', { id: 'gps' });
+        toast.loading('Resolving address...', { id: 'gps' });
+        try {
+          const { data } = await api.post('/profile/reverse-geocode', { latitude: lat, longitude: lng });
+          setAddress(data.address || '');
+          setCity(data.city || '');
+          setStateVal(data.state || '');
+          toast.success('Address auto-resolved successfully!', { id: 'gps' });
+        } catch (err) {
+          console.error(err);
+          toast.error('GPS coordinates detected but address lookup failed', { id: 'gps' });
+        }
         setDetectingLoc(false);
       },
       (error) => {
         console.error('GPS error:', error);
-        toast.error('Failed to get coordinates. Please enter them manually.', { id: 'gps' });
+        toast.error('Failed to get GPS location.', { id: 'gps' });
         setDetectingLoc(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -174,7 +212,11 @@ const ConnectFeature = () => {
   const handleSaveLocation = async (e) => {
     e.preventDefault();
     if (!latitude || !longitude) {
-      toast.error('Latitude and Longitude are required');
+      toast.error('Please click Auto-Detect via GPS first');
+      return;
+    }
+    if (!address.trim()) {
+      toast.error('Business address is required');
       return;
     }
 
@@ -183,7 +225,10 @@ const ConnectFeature = () => {
       await api.put('/profile/location', {
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
-        address: address || null,
+        address: address.trim(),
+        locationName: city ? `${city}, ${stateVal}` : address.trim(),
+        city: city || null,
+        state: stateVal || null,
       });
 
       toast.success('Location updated successfully!');
@@ -219,16 +264,74 @@ const ConnectFeature = () => {
     }
   };
 
-  const handlePlaceOrder = async (product, qty = null) => {
+  const handleConnectUser = async (e, otherUserId) => {
+    if (e) e.stopPropagation();
+    setConnectingUsers(prev => ({ ...prev, [otherUserId]: true }));
+    const loadingToastId = toast.loading('Connecting...');
     try {
-      const quantity = qty || product.moq || 1;
-      await api.post('/orders', {
-        productId: product.id,
-        quantity,
-      });
-      toast.success(`Order for ${quantity} ${product.unit || 'units'} placed successfully!`);
+      await api.post(`/connections/${otherUserId}`);
+      toast.success('Connected successfully!', { id: loadingToastId });
+      
+      // Update UI instantly
+      setProfiles(prev => prev.map(p => {
+        const pId = p.id || p.wholesaler?.id;
+        if (pId === otherUserId) {
+          return { ...p, isConnected: true };
+        }
+        return p;
+      }));
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to place order');
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Failed to connect', { id: loadingToastId });
+    } finally {
+      setConnectingUsers(prev => ({ ...prev, [otherUserId]: false }));
+    }
+  };
+
+  const handleConnectProfileUser = async (e, otherUserId) => {
+    await handleConnectUser(e, otherUserId);
+    setSellerProfile(prev => prev ? { ...prev, isConnected: true } : null);
+  };
+
+  const triggerOrderModal = (e, product) => {
+    if (e) e.stopPropagation();
+    setSelectedOrderProduct(product);
+    setOrderQty(product.moq || 1);
+    setOrderDeliveryLocation(user?.address || '');
+    setOrderNotes('');
+    setShowOrderModal(true);
+  };
+
+  const handlePlaceOrderSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedOrderProduct) return;
+
+    if (selectedOrderProduct.moq && orderQty < selectedOrderProduct.moq) {
+      toast.error(`Minimum order quantity not met. MOQ is ${selectedOrderProduct.moq}`);
+      return;
+    }
+
+    if (orderQty > selectedOrderProduct.stock_available) {
+      toast.error(`Order quantity exceeds available stock of ${selectedOrderProduct.stock_available}`);
+      return;
+    }
+
+    setPlacingOrder(true);
+    const loadingToastId = toast.loading('Placing order...');
+    try {
+      await api.post('/orders', {
+        productId: selectedOrderProduct.id,
+        quantity: parseInt(orderQty),
+        deliveryLocation: orderDeliveryLocation,
+        notes: orderNotes
+      });
+      toast.success('Order placed successfully!', { id: loadingToastId });
+      setShowOrderModal(false);
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Failed to place order', { id: loadingToastId });
+    } finally {
+      setPlacingOrder(false);
     }
   };
 
@@ -246,7 +349,8 @@ const ConnectFeature = () => {
           location: dLocation,
           sortBy: dSortBy,
           page: dPage,
-          limit: 12
+          limit: 12,
+          maxDistance: dMaxDistance
         }
       });
       setProfiles(data.profiles || []);
@@ -442,7 +546,7 @@ const ConnectFeature = () => {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2>📍 Update Business Geolocation</h2>
+              <h2>📍 Update Business Location</h2>
               <button className="btn-ghost" onClick={() => setShowLocationForm(false)}>
                 <FiX />
               </button>
@@ -450,52 +554,27 @@ const ConnectFeature = () => {
             <form onSubmit={handleSaveLocation}>
               <div className="modal-body">
                 <div className="location-form">
+                  {/* Button to detect GPS coordinates */}
+                  <button 
+                    type="button" 
+                    onClick={detectGeolocation} 
+                    className="btn btn-primary btn-block btn-sm"
+                    style={{ gap: 6, marginBottom: 20 }}
+                  >
+                    <FiNavigation /> Auto-Detect via GPS
+                  </button>
+
                   <div className="form-group">
-                    <label className="form-label">Full Address / Landmark</label>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      placeholder="e.g. Shop 24, Sector 4, Wholesale Market, Mumbai" 
+                    <label className="form-label">Business Display Address *</label>
+                    <textarea 
+                      className="form-textarea" 
+                      rows="3"
+                      required
+                      placeholder="e.g. Warehouse A, Kolkata, West Bengal, India" 
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                     />
                   </div>
-                  
-                  <div className="location-coords-grid">
-                    <div className="form-group">
-                      <label className="form-label">Latitude</label>
-                      <input 
-                        type="number" 
-                        step="any"
-                        required
-                        className="form-input" 
-                        placeholder="e.g. 19.0760" 
-                        value={latitude}
-                        onChange={(e) => setLatitude(e.target.value)}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Longitude</label>
-                      <input 
-                        type="number" 
-                        step="any"
-                        required
-                        className="form-input" 
-                        placeholder="e.g. 72.8777" 
-                        value={longitude}
-                        onChange={(e) => setLongitude(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <button 
-                    type="button" 
-                    onClick={detectGeolocation} 
-                    className="btn btn-secondary btn-block btn-sm"
-                    style={{ gap: 6 }}
-                  >
-                    <FiNavigation /> Auto-Detect via GPS
-                  </button>
                 </div>
               </div>
               <div className="modal-footer">
@@ -517,18 +596,20 @@ const ConnectFeature = () => {
         </div>
         
         {/* Settings button to update location anytime */}
-        {user && user.latitude && user.longitude && (
+        {user && (
           <button 
             onClick={() => {
-              setLatitude(user.latitude);
-              setLongitude(user.longitude);
+              setLatitude(user.latitude || '');
+              setLongitude(user.longitude || '');
               setAddress(user.address || '');
+              setCity(user.city || '');
+              setStateVal(user.state || '');
               setShowLocationForm(true);
             }} 
             className="btn btn-secondary btn-sm"
             style={{ gap: 6 }}
           >
-            <FiMapPin className="text-primary" /> Update Location (Coords: {user.latitude.toFixed(3)}, {user.longitude.toFixed(3)})
+            <FiMapPin className="text-primary" /> 📍 {user.location_name || user.city || 'Set Location'}
           </button>
         )}
       </div>
@@ -630,6 +711,7 @@ const ConnectFeature = () => {
                     setDMinPrice('');
                     setDMaxPrice('');
                     setDSortBy('nearest');
+                    setDMaxDistance('');
                     setDPage(1);
                   }}
                   className="btn btn-secondary btn-block btn-sm"
@@ -637,6 +719,35 @@ const ConnectFeature = () => {
                   Reset
                 </button>
               </div>
+            </div>
+
+            {/* Quick Proximity Filters */}
+            <div className="quick-proximity-filters" style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Proximity Filter:</span>
+              <button 
+                type="button"
+                className={`btn btn-sm ${dMaxDistance === '5' ? 'btn-primary' : 'btn-secondary'}`} 
+                onClick={() => { setDMaxDistance(dMaxDistance === '5' ? '' : '5'); setDPage(1); }}
+                style={{ borderRadius: '20px', fontSize: '12px', padding: '4px 12px' }}
+              >
+                📍 Within 5 km
+              </button>
+              <button 
+                type="button"
+                className={`btn btn-sm ${dMaxDistance === '10' ? 'btn-primary' : 'btn-secondary'}`} 
+                onClick={() => { setDMaxDistance(dMaxDistance === '10' ? '' : '10'); setDPage(1); }}
+                style={{ borderRadius: '20px', fontSize: '12px', padding: '4px 12px' }}
+              >
+                📍 Within 10 km
+              </button>
+              <button 
+                type="button"
+                className={`btn btn-sm ${dMaxDistance === '' ? 'btn-primary' : 'btn-secondary'}`} 
+                onClick={() => { setDMaxDistance(''); setDPage(1); }}
+                style={{ borderRadius: '20px', fontSize: '12px', padding: '4px 12px' }}
+              >
+                🌍 All
+              </button>
             </div>
           </div>
 
@@ -655,85 +766,184 @@ const ConnectFeature = () => {
           ) : (
             <div>
               <div className="seller-grid">
-                {profiles.map((profile) => {
-                  const id = profile.id || profile.wholesaler?.id;
-                  const shopName = profile.shop_name || profile.wholesaler?.shop_name || 'Verified Supplier';
-                  const role = profile.role || profile.wholesaler?.role || '';
-                  const addressVal = profile.address || profile.wholesaler?.address || 'Pan India';
-                  const totalProducts = profile.total_products !== undefined ? profile.total_products : (profile.productCount !== undefined ? profile.productCount : 0);
-                  const minPrice = profile.min_price !== undefined ? profile.min_price : (profile.minPrice !== undefined ? profile.minPrice : 0);
-                  const maxPrice = profile.max_price !== undefined ? profile.max_price : (profile.maxPrice !== undefined ? profile.maxPrice : 0);
-                  const distance = profile.distance !== undefined ? profile.distance : null;
-                  const topProducts = hoveredProducts[id] || profile.topProducts || [];
+                {(() => {
+                  const activeDistances = profiles.map(p => p.distance_km ?? p.distance).filter(d => d !== null && d > 0);
+                  const minDistance = activeDistances.length > 0 ? Math.min(...activeDistances) : Infinity;
 
-                  return (
-                    <div 
-                      key={id} 
-                      className="profile-card"
-                      onMouseEnter={() => handleMouseEnter(id)}
-                      onClick={() => navigate(`/connect/profile/${id}`)}
-                    >
-                      <div className="profile-card__header header">
-                        <div className="profile-card__avatar avatar">
-                          {shopName.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <h3 className="profile-card__title" style={{ margin: 0 }}>{shopName}</h3>
-                          <p className="profile-card__role" style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
-                            <span className="badge badge-accent" style={{ padding: '2px 8px', fontSize: 10 }}>
-                              {formatRoleLabel(role)}
-                            </span>
-                          </p>
-                        </div>
-                      </div>
+                  const activePrices = profiles.map(p => p.minPrice ?? p.min_price).filter(p => p > 0);
+                  const overallMinPrice = activePrices.length > 0 ? Math.min(...activePrices) : Infinity;
 
-                      <div className="profile-card__body body" style={{ marginTop: 12 }}>
-                        <p className="profile-card__meta" style={{ margin: '4px 0', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span>📍</span> <span className="line-clamp-1">{addressVal || "Location not set"}</span>
-                        </p>
-                        <p style={{ margin: '4px 0', fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span>📦</span> <span>{totalProducts} products</span>
-                        </p>
-                        <p style={{ margin: '4px 0', fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span>💰</span> <span>₹{minPrice} - ₹{maxPrice}</span>
-                        </p>
-                        {distance !== null && (
-                          <div style={{ marginTop: 6 }}>
-                            <span className="profile-card__distance">
-                              📍 {distance} km away
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                  const activeCounts = profiles.map(p => p.total_products !== undefined ? p.total_products : (p.productCount !== undefined ? p.productCount : 0));
+                  const maxCount = activeCounts.length > 0 ? Math.max(...activeCounts) : 0;
 
-                      <button 
-                        className="btn btn-secondary btn-sm" 
-                        style={{ marginTop: 14, width: '100%', justifyContent: 'center' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/connect/profile/${id}`);
-                        }}
+                  return profiles.map((profile) => {
+                    const id = profile.id || profile.wholesaler?.id;
+                    const shopName = profile.shop_name || profile.wholesaler?.shop_name || 'Verified Supplier';
+                    const role = profile.role || profile.wholesaler?.role || '';
+                    const addressVal = profile.address || profile.wholesaler?.address || 'Pan India';
+                    const totalProducts = profile.total_products !== undefined ? profile.total_products : (profile.productCount !== undefined ? profile.productCount : 0);
+                    const minPrice = profile.min_price !== undefined ? profile.min_price : (profile.minPrice !== undefined ? profile.minPrice : 0);
+                    const maxPrice = profile.max_price !== undefined ? profile.max_price : (profile.maxPrice !== undefined ? profile.maxPrice : 0);
+                    const distance = profile.distance_km !== undefined ? profile.distance_km : (profile.distance !== undefined ? profile.distance : null);
+                    const topProducts = hoveredProducts[id] || profile.topProducts || [];
+
+                    const isConnected = profile.isConnected;
+                    const sLat = profile.wholesaler?.latitude ?? profile.latitude;
+                    const sLng = profile.wholesaler?.longitude ?? profile.longitude;
+                    const hasS = sLat != null && sLng != null;
+
+                    // Smart Tags Matching
+                    const isClosest = distance !== null && distance > 0 && distance === minDistance;
+                    const isBestPrice = minPrice > 0 && minPrice === overallMinPrice;
+                    const isTrending = totalProducts > 0 && totalProducts === maxCount;
+
+                    const shortLoc = (profile.city && profile.state)
+                      ? `${profile.city}, ${profile.state}`
+                      : (profile.location_name || profile.wholesaler?.location_name || addressVal);
+
+                    return (
+                      <div 
+                        key={id} 
+                        className="profile-card"
+                        onMouseEnter={() => handleMouseEnter(id)}
                       >
-                        View Profile
-                      </button>
+                        <div className="profile-card-inner">
+                          {/* Front Side */}
+                          <div className="profile-card-front" onClick={() => navigate(`/connect/profile/${id}`)}>
+                            {/* Smart Badges Row */}
+                            {(isClosest || isBestPrice || isTrending) && (
+                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                                {isClosest && (
+                                  <span className="badge badge-success" style={{ gap: 2 }}>
+                                    🟢 Closest
+                                  </span>
+                                )}
+                                {isBestPrice && (
+                                  <span className="badge badge-primary" style={{ gap: 2 }}>
+                                    💰 Best Price
+                                  </span>
+                                )}
+                                {isTrending && (
+                                  <span className="badge badge-warning" style={{ gap: 2 }}>
+                                    🔥 Trending
+                                  </span>
+                                )}
+                              </div>
+                            )}
 
-                      {/* On Hover: Top 3 products display */}
-                      <div className="profile-card__hover-products">
-                        <h4 className="profile-card__hover-title">Top Products</h4>
-                        {topProducts.length > 0 ? (
-                          topProducts.map(prod => (
-                            <div key={prod.id} className="profile-card__hover-item">
-                              <span className="profile-card__hover-name">{prod.product_name}</span>
-                              <span className="profile-card__hover-price">₹{prod.price_per_unit}</span>
+                            <div className="profile-card__header header">
+                              <div className="profile-card__avatar avatar">
+                                {shopName.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <h3 className="profile-card__title" style={{ margin: 0 }}>{shopName}</h3>
+                                <p className="profile-card__role" style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
+                                  <span className="badge badge-accent" style={{ padding: '2px 8px', fontSize: 10 }}>
+                                    {formatRoleLabel(role)}
+                                  </span>
+                                </p>
+                              </div>
                             </div>
-                          ))
-                        ) : (
-                          <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '8px 0 0 0', textAlign: 'center' }}>No products listed</p>
-                        )}
+
+                            <div className="profile-card__body body" style={{ marginTop: 12, flex: 1 }}>
+                              <p className="profile-card__meta" style={{ margin: '4px 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span>📍</span> <span className="line-clamp-1" title={shortLoc}>{shortLoc}</span>
+                              </p>
+                              <p style={{ margin: '4px 0', fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span>📦</span> <span>{totalProducts} products</span>
+                              </p>
+                              <p style={{ margin: '4px 0', fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span>💰</span> <span>₹{minPrice} - ₹{maxPrice}</span>
+                              </p>
+                              {distance !== null && (
+                                <div style={{ marginTop: 6 }}>
+                                  <span className="badge badge-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    📍 {distance} km away
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div style={{ display: "flex", gap: 8, marginTop: "auto", paddingTop: 14 }}>
+                              {isConnected ? (
+                                <button
+                                  className="btn btn-primary btn-sm"
+                                  style={{ flex: 1, justifyContent: "center", gap: 4 }}
+                                  onClick={(e) => { e.stopPropagation(); startChatWithSeller(id); }}
+                                >
+                                  💬 Message
+                                </button>
+                              ) : (
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  style={{ flex: 1, justifyContent: "center", gap: 4 }}
+                                  onClick={(e) => handleConnectUser(e, id)}
+                                  disabled={connectingUsers[id]}
+                                >
+                                  {connectingUsers[id] ? (
+                                    <>
+                                      <span className="spinner spinner-xs" /> Connecting...
+                                    </>
+                                  ) : (
+                                    <>🔵 Connect</>
+                                  )}
+                                </button>
+                              )}
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                style={{ flex: 1, justifyContent: "center" }}
+                                onClick={(e) => { e.stopPropagation(); navigate(`/connect/profile/${id}`); }}
+                              >
+                                View Profile
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Back Side */}
+                          <div className="profile-card-back">
+                            <h4 className="profile-card__back-title">Top Products</h4>
+                            <div className="profile-card__back-products">
+                              {topProducts.length > 0 ? (
+                                topProducts.map(prod => (
+                                  <div key={prod.id} className="profile-card__hover-item">
+                                    <span className="profile-card__hover-name">{prod.product_name}</span>
+                                    <span className="profile-card__hover-price">₹{prod.price_per_unit}</span>
+                                  </div>
+                                ))
+                              ) : (
+                                <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '8px 0 0 0', textAlign: 'center' }}>No products listed</p>
+                              )}
+                            </div>
+
+                            <div className="profile-card__back-actions" style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: "auto" }}>
+                              <a
+                                href={hasS ? `https://www.google.com/maps/search/?api=1&query=${sLat},${sLng}` : '#'}
+                                target={hasS ? '_blank' : '_self'}
+                                rel="noopener noreferrer"
+                                className={`btn btn-secondary btn-sm ${!hasS ? 'disabled-map-btn' : ''}`}
+                                style={{ width: "100%", justifyContent: "center", textDecoration: 'none', gap: 6 }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!hasS) e.preventDefault();
+                                }}
+                                title={hasS ? "View exact shop location" : "Coordinates unavailable"}
+                              >
+                                📍 {hasS ? "View Location" : "No Location"}
+                              </a>
+                              <button
+                                className="btn btn-primary btn-sm"
+                                style={{ width: "100%", justifyContent: "center" }}
+                                onClick={(e) => { e.stopPropagation(); startChatWithSeller(id); }}
+                              >
+                                💬 Message
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
 
               {/* Pagination controls */}
@@ -795,14 +1005,14 @@ const ConnectFeature = () => {
                       </span>
                       <span>•</span>
                       <span className="flex items-center gap-1">
-                        <FiMapPin className="text-primary" /> {sellerProfile.address || 'Pan India'}
+                        <FiMapPin className="text-primary" /> {(sellerProfile.city && sellerProfile.state) ? `${sellerProfile.city}, ${sellerProfile.state}` : (sellerProfile.location_name || sellerProfile.address || 'Pan India')}
                       </span>
-                      {/* Show distance if user location is set */}
-                      {user && user.latitude && user.longitude && sellerProfile.latitude && sellerProfile.longitude && (
+                      {/* Show maps verified status */}
+                      {sellerProfile.latitude && sellerProfile.longitude && (
                         <>
                           <span>•</span>
                           <span className="badge badge-primary font-bold">
-                            📍 Coordinates Map Verified
+                            📍 Verified Location
                           </span>
                         </>
                       )}
@@ -811,40 +1021,55 @@ const ConnectFeature = () => {
                 </div>
 
                 <div className="profile-details__actions">
-                  {/* View Directions CTA */}
-                  {user?.latitude && user?.longitude && sellerProfile.latitude && sellerProfile.longitude ? (
+                  {/* View on Map CTA */}
+                  {sellerProfile.latitude && sellerProfile.longitude ? (
                     <a 
-                      href={`https://www.google.com/maps/dir/?api=1&origin=${user.latitude},${user.longitude}&destination=${sellerProfile.latitude},${sellerProfile.longitude}`}
+                      href={`https://www.google.com/maps/search/?api=1&query=${sellerProfile.latitude},${sellerProfile.longitude}`}
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="btn btn-secondary"
-                      style={{ textDecoration: 'none' }}
+                      style={{ textDecoration: 'none', gap: 6 }}
+                      title="View exact shop location"
                     >
-                      <FiMap /> View Directions
+                      <FiMap /> View Location
                     </a>
                   ) : (
-                    <div style={{ display: 'inline-block', position: 'relative' }} title={
-                      !sellerProfile.latitude 
-                        ? "Seller's GPS coordinates are unset" 
-                        : "Complete your business location coordinates to get directions"
-                    }>
+                    <div style={{ display: 'inline-block', position: 'relative' }} title="Seller's GPS coordinates are unset">
                       <button 
                         disabled
                         className="btn btn-secondary"
-                        style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                        style={{ opacity: 0.5, cursor: 'not-allowed', gap: 6 }}
                       >
-                        <FiMap /> Directions Locked <FiInfo style={{ marginLeft: 4 }} />
+                        <FiMap /> View Location (Disabled) <FiInfo style={{ marginLeft: 4 }} />
                       </button>
                     </div>
                   )}
 
                   {/* Message / Connect CTA */}
-                  <button 
-                    onClick={() => startChatWithSeller(sellerProfile.id)}
-                    className="btn btn-primary"
-                  >
-                    <FiMessageSquare /> Chat & Connect
-                  </button>
+                  {sellerProfile.isConnected ? (
+                    <button 
+                      onClick={() => startChatWithSeller(sellerProfile.id)}
+                      className="btn btn-primary"
+                      style={{ gap: 6 }}
+                    >
+                      <FiMessageSquare /> Message
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={(e) => handleConnectProfileUser(e, sellerProfile.id)}
+                      className="btn btn-primary"
+                      style={{ gap: 6 }}
+                      disabled={connectingUsers[sellerProfile.id]}
+                    >
+                      {connectingUsers[sellerProfile.id] ? (
+                        <>
+                          <span className="spinner spinner-xs" /> Connecting...
+                        </>
+                      ) : (
+                        <>🔵 Connect</>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -858,53 +1083,54 @@ const ConnectFeature = () => {
                   <p>This seller hasn't listed any wholesale products yet.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {sellerListings.map((product) => (
-                    <div key={product.id} className="group bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                      <div className="relative h-40 bg-gray-50 rounded-xl mb-4 overflow-hidden flex items-center justify-center">
-                         <FiPackage className="text-5xl text-gray-200 group-hover:scale-110 transition-transform duration-500" />
-                         <div className="absolute top-2 right-2">
-                            <span className="bg-white/90 backdrop-blur-sm text-teal-600 px-3 py-1 rounded-full text-xs font-bold shadow-sm border border-teal-50">
-                              {product.category}
-                            </span>
-                         </div>
-                      </div>
-                      
-                      <div className="mb-4">
-                        <h3 className="text-base font-bold text-gray-900 line-clamp-1 mb-1">{product.product_name}</h3>
-                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                    <div key={product.id} className="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between" style={{ minHeight: "220px", borderRadius: "16px" }}>
+                      {/* Top: Name, Category, Location */}
+                      <div className="mb-3">
+                        <div className="flex justify-between items-start gap-2 mb-1.5">
+                          <h3 className="text-sm font-bold text-gray-900 line-clamp-2" style={{ margin: 0 }}>{product.product_name}</h3>
+                          <span className="bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full text-[10px] font-bold border border-teal-100 flex-shrink-0">
+                            {product.category}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 flex items-center gap-1" style={{ margin: 0 }}>
                           <FiMapPin className="text-teal-500" /> {product.location || 'Pan India'}
                         </p>
                       </div>
 
-                      <div className="flex flex-col gap-3">
-                        <div className="flex justify-between items-end">
-                          <div>
-                            <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Price / {product.unit || 'piece'}</p>
-                            <p className="text-xl font-black text-indigo-600">₹{product.price_per_unit}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">MOQ</p>
-                            <p className="text-xs font-bold text-gray-700">{product.moq} {product.unit || 'units'}</p>
+                      {/* Middle: Price, Unit, MOQ */}
+                      <div className="mb-4 pt-3 border-t border-gray-50 flex justify-between items-end">
+                        <div>
+                          <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold" style={{ margin: 0 }}>Price</p>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-lg font-black text-indigo-600">₹{product.price_per_unit}</span>
+                            <span className="text-xs text-gray-400 font-medium">/ {product.unit || 'unit'}</span>
                           </div>
                         </div>
+                        <div className="text-right">
+                          <span className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded text-[10px] font-bold border border-indigo-100">
+                            MOQ: {product.moq} {product.unit || 'units'}
+                          </span>
+                        </div>
+                      </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          <button 
-                            onClick={() => triggerInquiryModal(product)}
-                            className="btn btn-secondary btn-sm"
-                            style={{ width: '100%', justifyContent: 'center' }}
-                          >
-                            Inquire
-                          </button>
-                          <button 
-                            onClick={() => handlePlaceOrder(product)}
-                            className="btn btn-primary btn-sm"
-                            style={{ width: '100%', justifyContent: 'center' }}
-                          >
-                            Order
-                          </button>
-                        </div>
+                      {/* Bottom: Buttons */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 'auto' }}>
+                        <button 
+                          onClick={() => triggerInquiryModal(product)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ width: '100%', justifyContent: 'center' }}
+                        >
+                          Inquire
+                        </button>
+                        <button 
+                          onClick={(e) => triggerOrderModal(e, product)}
+                          className="btn btn-primary btn-sm"
+                          style={{ width: '100%', justifyContent: 'center' }}
+                        >
+                          Order
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -942,60 +1168,62 @@ const ConnectFeature = () => {
           ) : marketplaceProducts.length === 0 ? (
             <div className="empty-state card">
               <div className="empty-state-icon">📦</div>
-              <h3>No products listed</h3>
-              <p>Be the first to list products, or adjust your search.</p>
+              <h3>No products found</h3>
+              <p>Try searching for different items or categories.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {marketplaceProducts.map((product) => (
-                <div key={product.id} className="group bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                  <div className="relative h-48 bg-gray-50 rounded-xl mb-4 overflow-hidden flex items-center justify-center">
-                     <FiPackage className="text-5xl text-gray-200 group-hover:scale-110 transition-transform duration-500" />
-                     <div className="absolute top-2 right-2">
-                        <span className="bg-white/90 backdrop-blur-sm text-teal-600 px-3 py-1 rounded-full text-xs font-bold shadow-sm border border-teal-50">
-                          {product.category}
-                        </span>
-                     </div>
-                  </div>
-                  
-                  <div className="mb-4">
-                    <h3 className="text-lg font-bold text-gray-900 line-clamp-1 mb-1">{product.product_name}</h3>
-                    <p className="text-sm text-gray-500 flex items-center gap-1">
+                <div key={product.id} className="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between" style={{ minHeight: "240px", borderRadius: "16px" }}>
+                  {/* Top: Name, Category, Location */}
+                  <div className="mb-3">
+                    <div className="flex justify-between items-start gap-2 mb-1.5">
+                      <h3 className="text-sm font-bold text-gray-900 line-clamp-2" style={{ margin: 0 }}>{product.product_name}</h3>
+                      <span className="bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full text-[10px] font-bold border border-teal-100 flex-shrink-0">
+                        {product.category}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 flex items-center gap-1" style={{ margin: 0 }}>
                       <FiMapPin className="text-teal-500" /> {product.location || 'Pan India'}
                     </p>
                   </div>
 
-                  <div className="flex flex-col gap-3">
-                    <div className="flex justify-between items-end">
-                      <div>
-                        <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Price per {product.unit || 'unit'}</p>
-                        <p className="text-2xl font-black text-indigo-600">₹{product.price_per_unit}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Min Order</p>
-                        <p className="text-sm font-bold text-gray-700">{product.moq} {product.unit || 'units'}</p>
+                  {/* Middle: Price, Unit, MOQ */}
+                  <div className="mb-4 pt-3 border-t border-gray-50 flex justify-between items-end">
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold" style={{ margin: 0 }}>Price</p>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-lg font-black text-indigo-600">₹{product.price_per_unit}</span>
+                        <span className="text-xs text-gray-400 font-medium">/ {product.unit || 'unit'}</span>
                       </div>
                     </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <button 
-                        onClick={() => triggerInquiryModal(product)}
-                        className="btn btn-secondary"
-                        style={{ width: '100%', justifyContent: 'center' }}
-                      >
-                        Inquire
-                      </button>
-                      <button 
-                        onClick={() => handlePlaceOrder(product)}
-                        className="btn btn-primary"
-                        style={{ width: '100%', justifyContent: 'center' }}
-                      >
-                        Order Now
-                      </button>
+                    <div className="text-right">
+                      <span className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded text-[10px] font-bold border border-indigo-100">
+                        MOQ: {product.moq} {product.unit || 'units'}
+                      </span>
                     </div>
                   </div>
-                  
-                  <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+
+                  {/* Bottom: Buttons */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <button 
+                      onClick={() => triggerInquiryModal(product)}
+                      className="btn btn-secondary btn-sm"
+                      style={{ width: '100%', justifyContent: 'center' }}
+                    >
+                      Inquire
+                    </button>
+                    <button 
+                      onClick={(e) => triggerOrderModal(e, product)}
+                      className="btn btn-primary btn-sm"
+                      style={{ width: '100%', justifyContent: 'center' }}
+                    >
+                      Order
+                    </button>
+                  </div>
+
+                  {/* Supplier info at bottom */}
+                  <div className="mt-3 pt-3 border-t border-gray-50 flex items-center justify-between text-[10px] text-gray-400 font-bold uppercase tracking-wider">
                      <span>Supplier: {product.wholesaler?.shop_name || 'Verified Seller'}</span>
                   </div>
                 </div>
@@ -1051,7 +1279,7 @@ const ConnectFeature = () => {
                           <h3 className="profile-card__title">{conn.otherUser.shop_name}</h3>
                           <p className="profile-card__meta">
                             <FiMapPin className="text-primary" />
-                            <span className="line-clamp-1">{conn.otherUser.address || 'Pan India'}</span>
+                            <span className="line-clamp-1">{(conn.otherUser.city && conn.otherUser.state) ? `${conn.otherUser.city}, ${conn.otherUser.state}` : (conn.otherUser.location_name || conn.otherUser.address || 'Pan India')}</span>
                           </p>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
                             <button 
@@ -1097,7 +1325,7 @@ const ConnectFeature = () => {
                           <h3 className="profile-card__title">{conn.otherUser.shop_name}</h3>
                           <p className="profile-card__meta">
                             <FiMapPin className="text-primary" />
-                            <span className="line-clamp-1">{conn.otherUser.address || 'Pan India'}</span>
+                            <span className="line-clamp-1">{(conn.otherUser.city && conn.otherUser.state) ? `${conn.otherUser.city}, ${conn.otherUser.state}` : (conn.otherUser.location_name || conn.otherUser.address || 'Pan India')}</span>
                           </p>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16, padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600 }}>
                             <FiClock className="animate-spin text-primary" style={{ animationDuration: '3s' }} /> Waiting for Approval
@@ -1134,7 +1362,7 @@ const ConnectFeature = () => {
                           <h3 className="profile-card__title">{conn.otherUser.shop_name}</h3>
                           <p className="profile-card__meta">
                             <FiMapPin className="text-primary" />
-                            <span className="line-clamp-1">{conn.otherUser.address || 'Pan India'}</span>
+                            <span className="line-clamp-1">{(conn.otherUser.city && conn.otherUser.state) ? `${conn.otherUser.city}, ${conn.otherUser.state}` : (conn.otherUser.location_name || conn.otherUser.address || 'Pan India')}</span>
                           </p>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
                             <button 
@@ -1361,6 +1589,91 @@ const ConnectFeature = () => {
                 <button type="button" className="btn btn-secondary" onClick={() => setShowInquiryModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={sendingInquiry}>
                   {sendingInquiry ? 'Sending...' : 'Send Inquiry'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ── Order Overlay Modal Component ── */}
+      {showOrderModal && selectedOrderProduct && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h2>🛒 Place B2B Order</h2>
+              <button className="btn-ghost" onClick={() => setShowOrderModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <form onSubmit={handlePlaceOrderSubmit}>
+              <div className="modal-body">
+                <div>
+                  <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary-muted)', padding: 16, borderRadius: 12, marginBottom: 20 }}>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{selectedOrderProduct.product_name}</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13, color: 'var(--text-secondary)' }}>
+                      <div>💰 Unit Price: <strong>₹{selectedOrderProduct.price_per_unit}</strong></div>
+                      <div>📦 Available Stock: <strong>{selectedOrderProduct.stock_available} {selectedOrderProduct.unit || 'units'}</strong></div>
+                      {selectedOrderProduct.moq > 0 && (
+                        <div style={{ gridColumn: 'span 2' }}>
+                          ⚠️ Minimum Order Quantity (MOQ): <strong>{selectedOrderProduct.moq} {selectedOrderProduct.unit || 'units'}</strong>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Quantity</label>
+                    <input 
+                      type="number" 
+                      min={selectedOrderProduct.moq || 1}
+                      max={selectedOrderProduct.stock_available}
+                      required 
+                      className="form-input" 
+                      value={orderQty}
+                      onChange={(e) => setOrderQty(parseInt(e.target.value) || '')}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Delivery Location</label>
+                    <input 
+                      type="text" 
+                      required 
+                      className="form-input" 
+                      value={orderDeliveryLocation}
+                      onChange={(e) => setOrderDeliveryLocation(e.target.value)}
+                      placeholder="Enter exact delivery address..."
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Notes for Seller (Optional)</label>
+                    <textarea 
+                      rows="3" 
+                      className="form-textarea"
+                      value={orderNotes}
+                      onChange={(e) => setOrderNotes(e.target.value)}
+                      placeholder="Add any specific delivery instructions..."
+                    />
+                  </div>
+
+                  {/* live computation */}
+                  <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Total Price:</span>
+                    <span style={{ fontSize: 24, fontWeight: 900, color: 'var(--primary)' }}>
+                      ₹{((parseInt(orderQty) || 0) * (selectedOrderProduct.price_per_unit || 0)).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowOrderModal(false)}>Cancel</button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  disabled={placingOrder || !orderQty || orderQty < selectedOrderProduct.moq || orderQty > selectedOrderProduct.stock_available}
+                >
+                  {placingOrder ? 'Placing Order...' : 'Place Order'}
                 </button>
               </div>
             </form>
