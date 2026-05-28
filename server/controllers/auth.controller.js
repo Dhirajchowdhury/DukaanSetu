@@ -36,41 +36,40 @@ const toPublicUser = (row) => ({
  * @route POST /api/auth/signup
  */
 const signup = async (req, res, next) => {
+  console.log("Signup payload:", req.body);
   try {
-    const { email, password, shopName, phoneNumber, role } = req.body;
+    const email = req.body.email;
+    const password = req.body.password;
+    const shop_name = req.body.shop_name ?? req.body.shopName;
+    const phone_number = req.body.phone_number ?? req.body.phoneNumber;
+    const role = req.body.role;
 
-    // Check duplicate email
-    const { data: existing } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email.toLowerCase())
-      .maybeSingle();
-
-    if (existing) {
-      return res.status(400).json({ message: 'Email already registered' });
+    if (!email || !password || !shop_name || !role) {
+      return res.status(400).json({ message: "Missing fields" });
     }
 
-    const password_hash = await bcrypt.hash(password, 12);
+    const password_hash = await bcrypt.hash(password, 10);
 
     const { data: user, error } = await supabase
       .from('users')
-      .insert({
+      .insert([{
         email: email.toLowerCase(),
         password_hash,
-        shop_name:    shopName,
-        phone_number: phoneNumber,
-        role:         role || 'shop_owner',
+        shop_name,
+        phone_number,
+        role,
         email_verified: true, // Auto-verify for MVP
-      })
+      }])
       .select()
       .single();
 
-    if (error) throw error;
-
-    // Skip OTP for MVP
-    // const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    // ...
-    // await sendVerificationEmail(email, otp);
+    if (error) {
+      console.error("Supabase error:", error);
+      if (error.code === '23505') {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+      return res.status(400).json({ message: error.message });
+    }
 
     const accessToken  = generateAccessToken(user.id, user.role);
     const refreshToken = generateRefreshToken(user.id);
@@ -87,8 +86,9 @@ const signup = async (req, res, next) => {
       accessToken,
       user: toPublicUser(user),
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    console.error("Signup error FULL:", err);
+    next(err);
   }
 };
 
@@ -158,6 +158,7 @@ const verifyEmail = async (req, res, next) => {
  * @route POST /api/auth/login
  */
 const login = async (req, res, next) => {
+  console.log("Login payload:", req.body);
   try {
     const { email, password } = req.body;
 
@@ -165,9 +166,10 @@ const login = async (req, res, next) => {
       .from('users')
       .select('*')
       .eq('email', email.toLowerCase())
-      .maybeSingle();
+      .single();
 
     if (error || !user) {
+      console.error("Supabase error:", error);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
@@ -179,11 +181,6 @@ const login = async (req, res, next) => {
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-
-    // Skip verification check for MVP
-    // if (!user.email_verified) {
-    //   return res.status(403).json({ message: 'Please verify your email first' });
-    // }
 
     const accessToken  = generateAccessToken(user.id, user.role);
     const refreshToken = generateRefreshToken(user.id);
@@ -200,8 +197,9 @@ const login = async (req, res, next) => {
       accessToken,
       user: toPublicUser(user),
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    console.error("Login error FULL:", err);
+    next(err);
   }
 };
 

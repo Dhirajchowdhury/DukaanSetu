@@ -17,7 +17,7 @@ const Signup = () => {
   const navigate = useNavigate();
   const { signup } = useAuth();
   const [form, setForm] = useState({
-    email: '', password: '', shopName: '', phoneNumber: '', role: 'shop_owner',
+    email: '', password: '', shop_name: '', phone_number: '', role: 'shop_owner',
   });
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -87,8 +87,8 @@ const Signup = () => {
                   <FiUser className="auth-input-icon" />
                   <input
                     className="form-input auth-input"
-                    name="shopName"
-                    value={form.shopName}
+                    name="shop_name"
+                    value={form.shop_name}
                     onChange={handleChange}
                     placeholder="My General Store"
                     required
@@ -119,8 +119,8 @@ const Signup = () => {
                   <input
                     className="form-input auth-input"
                     type="tel"
-                    name="phoneNumber"
-                    value={form.phoneNumber}
+                    name="phone_number"
+                    value={form.phone_number}
                     onChange={handleChange}
                     placeholder="+91 98765 43210"
                     required
