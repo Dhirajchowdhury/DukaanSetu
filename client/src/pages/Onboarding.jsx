@@ -35,10 +35,8 @@ const Onboarding = () => {
   const { user, checkAuth } = useAuth();
   const navigate = useNavigate();
 
-  /* 2 steps for shop_owner (Profile → Location)
-     3 steps for supplier roles (Profile → Location → First Listing) */
-  const isShopOwner = user?.role === 'shop_owner';
-  const totalSteps  = isShopOwner ? 2 : 3;
+  /* Exactly 2 steps for all users (Profile → Location) */
+  const totalSteps  = 2;
 
   const [step,       setStep]       = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -56,15 +54,6 @@ const Onboarding = () => {
   const [stateVal,     setStateVal]     = useState(user?.state        || '');
   const [detecting,    setDetecting]    = useState(false);
   const [geocoding,    setGeocoding]    = useState(false);
-
-  /* Step 3 — First listing (supplier only) */
-  const [productName,    setProductName]    = useState('');
-  const [category,       setCategory]       = useState('Groceries');
-  const [pricePerUnit,   setPricePerUnit]   = useState('');
-  const [moq,            setMoq]            = useState(1);
-  const [stockAvailable, setStockAvailable] = useState('');
-  const [unit,           setUnit]           = useState('pieces');
-  const [description,    setDescription]    = useState('');
 
   /* ── Auto reverse-geocode when coords change ── */
   useEffect(() => {
@@ -121,12 +110,7 @@ const Onboarding = () => {
     } else if (step === 2) {
       if (!latitude || !longitude) return toast.error('Please click Auto-Detect My Location to set your coordinates.');
       if (!address.trim()) return toast.error('Please verify or enter your business address.');
-      if (totalSteps === 2) {
-        // shop_owner — submit directly from step 2
-        document.getElementById('onboarding-form').requestSubmit();
-      } else {
-        setStep(3);
-      }
+      document.getElementById('onboarding-form').requestSubmit();
     }
   };
 
@@ -150,24 +134,7 @@ const Onboarding = () => {
         state:        stateVal.trim(),
       });
 
-      // 3. Supplier: create first listing
-      if (!isShopOwner) {
-        if (!productName.trim() || !pricePerUnit || !stockAvailable) {
-          throw new Error('Please fill in all product details');
-        }
-        await api.post('/connect/my-listings', {
-          productName,
-          category,
-          pricePerUnit:   parseFloat(pricePerUnit),
-          moq:            parseInt(String(moq)) || 1,
-          stockAvailable: parseInt(String(stockAvailable)) || 0,
-          unit,
-          location:       locationName || address,
-          description,
-        });
-      }
-
-      // 4. Mark complete
+      // 3. Mark complete
       await api.put('/profile/complete');
 
       toast.success('Setup complete! Welcome to DukaanSetu 🎉');
@@ -182,9 +149,7 @@ const Onboarding = () => {
   };
 
   /* ── Step labels ── */
-  const stepLabels = isShopOwner
-    ? ['Profile', 'Location']
-    : ['Profile', 'Location', 'First Listing'];
+  const stepLabels = ['Profile', 'Location'];
 
   return (
     <div className="onboarding-page">
@@ -212,7 +177,6 @@ const Onboarding = () => {
         <div className="onboarding-header">
           {step === 1 && <><h1>Complete Your Business Profile</h1><p>Basic information about your business</p></>}
           {step === 2 && <><h1>Set Your Location</h1><p>Help nearby partners discover you</p></>}
-          {step === 3 && <><h1>Add Your First Listing</h1><p>Publish a product so buyers can find you</p></>}
         </div>
 
         <form id="onboarding-form" onSubmit={handleSubmit}>
@@ -309,87 +273,6 @@ const Onboarding = () => {
               </div>
             </div>
           )}
-
-          {/* ── STEP 3: First Listing (supplier only) ── */}
-          {step === 3 && (
-            <div className="step-content">
-              <div className="form-group">
-                <label>Product Name *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Fortune Mustard Oil"
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label>Category *</label>
-                  <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                    {ONBOARDING_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Unit *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Litre, Box, Kg"
-                    value={unit}
-                    onChange={(e) => setUnit(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label>Price per Unit (₹) *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="150"
-                    value={pricePerUnit}
-                    onChange={(e) => setPricePerUnit(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Min Order Qty (MOQ)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="1"
-                    value={moq}
-                    onChange={(e) => setMoq(Number(e.target.value))}
-                  />
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Initial Stock Available *</label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="100"
-                  value={stockAvailable}
-                  onChange={(e) => setStockAvailable(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>Short Description</label>
-                <textarea
-                  placeholder="Bulk discount offers, lead time, etc."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={2}
-                />
-              </div>
-            </div>
-          )}
-
           {/* Navigation */}
           <div className="onboarding-actions">
             {step > 1 && (
