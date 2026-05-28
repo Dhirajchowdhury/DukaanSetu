@@ -20,6 +20,9 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 const connectDB = async () => {
+  // Safety log — confirms service role key is loaded (never logs the key itself)
+  console.log('🔑 Supabase service role key loaded:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+
   try {
     // Lightweight connectivity check
     const { error } = await supabase.from('users').select('id').limit(1);
