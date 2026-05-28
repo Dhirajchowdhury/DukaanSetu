@@ -8,6 +8,7 @@ router.use(protect);
 router.post('/reverse-geocode', reverseGeocode);
 router.put('/complete',       markProfileComplete);
 router.put('/location',       updateLocation);
+router.post('/update-location', updateLocation);
 router.get('/recommended',    getRecommended);
 router.get('/trending',       getTrending);
 router.get('/discover',      discoverProfiles);

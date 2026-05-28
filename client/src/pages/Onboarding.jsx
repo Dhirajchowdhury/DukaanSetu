@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -32,6 +33,7 @@ const ONBOARDING_CATEGORIES = [
 
 const Onboarding = () => {
   const { user, checkAuth } = useAuth();
+  const navigate = useNavigate();
 
   /* 2 steps for shop_owner (Profile → Location)
      3 steps for supplier roles (Profile → Location → First Listing) */
@@ -69,13 +71,14 @@ const Onboarding = () => {
     if (!latitude || !longitude) return;
     let cancelled = false;
     setGeocoding(true);
-    api.post('/profile/reverse-geocode', { latitude, longitude })
+    api.post('/profile/reverse-geocode', { lat: latitude, lng: longitude })
       .then(({ data }) => {
         if (!cancelled) {
-          setAddress(data.address || '');
-          setCity(data.city || '');
-          setStateVal(data.state || '');
-          setLocationName(data.city ? `${data.city}, ${data.state}` : (data.address || ''));
+          const loc = data.location || {};
+          setAddress(loc.address || '');
+          setCity(loc.city || '');
+          setStateVal(loc.state || '');
+          setLocationName(loc.city ? `${loc.city}, ${loc.state}` : (loc.address || ''));
           setGeocoding(false);
         }
       })
@@ -138,9 +141,9 @@ const Onboarding = () => {
       await api.put('/auth/profile', { shopName, phoneNumber });
 
       // 2. Save location with readable name
-      await api.put('/profile/location', {
-        latitude:     parseFloat(String(latitude)),
-        longitude:    parseFloat(String(longitude)),
+      await api.post('/profile/update-location', {
+        lat:          parseFloat(String(latitude)),
+        lng:          parseFloat(String(longitude)),
         address:      address.trim(),
         locationName: locationName.trim() || address.trim(),
         city:         city.trim(),
@@ -169,6 +172,7 @@ const Onboarding = () => {
 
       toast.success('Setup complete! Welcome to DukaanSetu 🎉');
       await checkAuth();
+      navigate('/dashboard');
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || err.message || 'Setup failed');

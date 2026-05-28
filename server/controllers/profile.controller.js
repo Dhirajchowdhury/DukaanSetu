@@ -49,7 +49,12 @@ const buildProfiles = (rows, currentUser) => {
  */
 const updateLocation = async (req, res, next) => {
   try {
-    const { latitude, longitude, address: manualAddress, city: manualCity, state: manualState } = req.body;
+    const latitude = req.body.latitude ?? req.body.lat;
+    const longitude = req.body.longitude ?? req.body.lng;
+    const manualAddress = req.body.address;
+    const manualCity = req.body.city;
+    const manualState = req.body.state;
+
     if (latitude === undefined || longitude === undefined) {
       return res.status(400).json({ message: 'latitude and longitude are required' });
     }
@@ -531,7 +536,13 @@ const reverseGeocode = async (req, res, next) => {
     }
 
     const result = await locationService.reverseGeocode(parseFloat(lat), parseFloat(lng));
-    res.json(result);
+    res.json({
+      location: {
+        address: result.address,
+        city:    result.city,
+        state:   result.state,
+      }
+    });
   } catch (error) {
     next(error);
   }

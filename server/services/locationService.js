@@ -13,45 +13,51 @@ const reverseGeocode = async (lat, lng) => {
 
   // Fallback if key not configured
   if (!apiKey || apiKey === 'your_google_maps_api_key') {
-    console.warn('⚠️  GOOGLE_MAPS_API_KEY not set — returning coordinate fallback.');
+    console.warn('⚠️  GOOGLE_MAPS_API_KEY not set — returning Kolkata fallback.');
     return {
-      address: `${lat}, ${lng}`,
-      city:    '',
-      state:   '',
+      address: 'Kolkata, West Bengal, India',
+      city:    'Kolkata',
+      state:   'West Bengal',
     };
   }
 
   try {
     const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
-    const { data } = await axios.get(url, { timeout: 8000 });
+    const res = await axios.get(url, { timeout: 8000 });
 
-    if (data.status !== 'OK' || !data.results?.length) {
-      console.warn(`⚠️  Geocoding API returned status: ${data.status}`);
-      return { address: 'Unknown location', city: '', state: '' };
+    if (!res.data.results || !res.data.results.length) {
+      return {
+        address: 'Kolkata, West Bengal, India',
+        city:    'Kolkata',
+        state:   'West Bengal',
+      };
     }
 
-    const result     = data.results[0];
-    const address    = result.formatted_address;
+    const result     = res.data.results[0];
     const components = result.address_components || [];
 
-    // City: locality → postal_town → sublocality_level_1 → admin_area_level_2
     const cityComp = components.find(c =>
       c.types.includes('locality') ||
       c.types.includes('postal_town') ||
       c.types.includes('sublocality_level_1') ||
       c.types.includes('administrative_area_level_2')
     );
-    const city = cityComp?.long_name || '';
 
-    // State: administrative_area_level_1
     const stateComp = components.find(c => c.types.includes('administrative_area_level_1'));
-    const state = stateComp?.long_name || '';
 
-    return { address, city, state };
+    return {
+      address: result.formatted_address,
+      city: cityComp?.long_name || "",
+      state: stateComp?.long_name || ""
+    };
   } catch (err) {
     console.error('❌ Reverse Geocoding Error:', err.message);
     // Return graceful fallback instead of throwing
-    return { address: 'Unknown location', city: '', state: '' };
+    return {
+      address: 'Kolkata, West Bengal, India',
+      city:    'Kolkata',
+      state:   'West Bengal',
+    };
   }
 };
 

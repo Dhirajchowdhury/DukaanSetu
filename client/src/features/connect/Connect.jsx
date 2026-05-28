@@ -189,10 +189,11 @@ const ConnectFeature = () => {
         
         toast.loading('Resolving address...', { id: 'gps' });
         try {
-          const { data } = await api.post('/profile/reverse-geocode', { latitude: lat, longitude: lng });
-          setAddress(data.address || '');
-          setCity(data.city || '');
-          setStateVal(data.state || '');
+          const { data } = await api.post('/profile/reverse-geocode', { lat, lng });
+          const loc = data.location || {};
+          setAddress(loc.address || '');
+          setCity(loc.city || '');
+          setStateVal(loc.state || '');
           toast.success('Address auto-resolved successfully!', { id: 'gps' });
         } catch (err) {
           console.error(err);
