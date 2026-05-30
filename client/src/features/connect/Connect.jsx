@@ -627,6 +627,7 @@ const ConnectFeature = () => {
   const fetchDiscoverProfiles = async () => {
     setDLoading(true);
     try {
+      // API baseURL: /api  →  full URL: /api/profile/discover
       const { data } = await api.get('/profile/discover', {
         params: {
           search: dSearch,
@@ -644,8 +645,16 @@ const ConnectFeature = () => {
       setProfiles(data.profiles || []);
       setDPages(data.pagination?.pages || 1);
     } catch (error) {
-      console.error(error);
-      toast.error('Failed to load seller discovery profiles');
+      console.error("DISCOVER API ERROR:", {
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+        fullURL: error.config?.baseURL + error.config?.url,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+      });
+      toast.error(error.response?.data?.message || 'Failed to load seller discovery profiles');
     } finally {
       setDLoading(false);
     }

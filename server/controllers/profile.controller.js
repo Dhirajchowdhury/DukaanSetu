@@ -120,97 +120,25 @@ const markProfileComplete = async (req, res, next) => {
  */
 const discoverProfiles = async (req, res, next) => {
   try {
-    const {
-      search, category, role, minPrice, maxPrice,
-      location, sortBy = 'name', page = 1, limit = 20,
-      maxDistance, city,
-    } = req.query;
+    console.log("[B2B DISCOVER] Query parameters:", req.query);
 
-    console.log("[B2B DISCOVER] Query parameters received:", req.query);
-    console.log("[B2B DISCOVER] req.user:", JSON.stringify({ id: req.user?.id, role: req.user?.role, email: req.user?.email }));
-
-    const searchLower = search ? search.toLowerCase() : null;
-    const categoryLower = category ? category.toLowerCase() : null;
-    const locationLower = location ? location.toLowerCase() : null;
-    const minP = minPrice ? parseFloat(minPrice) : null;
-    const maxP = maxPrice ? parseFloat(maxPrice) : null;
-
-    // JS-side case-insensitive role filter
-    const supplierType = role && role.toLowerCase() !== 'all' && role.toLowerCase() !== 'all roles' && role !== 'all_roles' && role !== ''
-      ? role.toLowerCase()
-      : null;
-    console.log(`[B2B DISCOVER] supplierType: ${supplierType}`);
-
-    // ── STEP 1: Verify raw data ──────────────────────────────────────────
-    // Fetch ALL supplier-role users (no filters, no joins)
-    const { data: rawUsers, error: rawErr } = await supabase
-      .from('users')
-      .select('id, email, shop_name, role, latitude, longitude, address, city, state, is_profile_complete, created_at')
-      .in('role', ['wholesaler', 'distributor', 'producer']);
-
-    if (rawErr) {
-      console.error("[B2B DISCOVER] RAW users query FAILED:", rawErr);
-      return res.status(500).json({ message: 'DB query failed', error: rawErr });
-    }
-
-    console.log(`[B2B DISCOVER] RAW users count (no join): ${rawUsers?.length || 0}`);
-    if (rawUsers && rawUsers.length > 0) {
-      rawUsers.forEach(u => console.log(`[B2B DISCOVER] RAW user: id=${u.id}, shop_name="${u.shop_name}", role="${u.role}"`));
-    } else {
-      console.log("[B2B DISCOVER] RAW USERS IS EMPTY — possible RLS or query issue!");
-    }
-
-    // ── STEP 2: Now try WITH the product join ────────────────────────────
     const { data: users, error } = await supabase
       .from('users')
-      .select(`
-        id, email, shop_name, role, latitude, longitude, address, city, state, is_profile_complete, created_at,
-        wholesaler_products:wholesaler_products(*)
-      `)
+      .select('id, shop_name, role, city, state')
       .in('role', ['wholesaler', 'distributor', 'producer']);
 
     if (error) {
-      console.error("[B2B DISCOVER] JOIN query failed:", error);
-      return res.status(500).json({ message: 'DB join query failed', error });
+      console.error("[B2B DISCOVER] Query failed:", error);
+      return res.status(500).json({ message: 'DB query failed', error });
     }
 
-    console.log(`[B2B DISCOVER] JOIN query users count: ${users?.length || 0}`);
+    console.log(`[B2B DISCOVER] Users fetched: ${users?.length || 0}`);
 
-    // ── STEP 3: Return debug response (bypassing all filters) ─────────────
-    // Build a simple unfiltered profile list from raw users for verification
-    const debugProfiles = (rawUsers || [])
-      .filter(u => u.id !== req.user.id)  // only exclude self
-      .map(u => ({
-        id: u.id,
-        shop_name: u.shop_name,
-        role: u.role,
-        latitude: u.latitude,
-        longitude: u.longitude,
-        address: u.address,
-        city: u.city,
-        state: u.state,
-        hasProducts: false,
-        productCount: 0,
-      }));
+    const profiles = (users || []).filter(u => u.id !== req.user.id);
 
-    console.log(`[B2B DISCOVER] DEBUG — Returning ${debugProfiles.length} raw unfiltered profiles (excluding self)`);
+    console.log(`[B2B DISCOVER] Returning ${profiles.length} profiles`);
 
-    res.json({
-      profiles: debugProfiles,
-      pagination: { page: 1, limit: debugProfiles.length, total: debugProfiles.length, pages: 1 },
-      _debug: {
-        rawUsersCount: rawUsers?.length || 0,
-        joinedUsersCount: users?.length || 0,
-        supplierType,
-        reqUserId: req.user?.id,
-        hasJoinedProducts: users?.map(u => ({
-          id: u.id,
-          shop_name: u.shop_name,
-          role: u.role,
-          productCount: (u.wholesaler_products || []).length,
-        })) || [],
-      },
-    });
+    return res.json({ profiles });
   } catch (error) {
     next(error);
   }
