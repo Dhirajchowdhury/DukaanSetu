@@ -3,7 +3,7 @@ import { InventoryFilterState } from '../types';
 import api from '../../../services/api';
 
 interface Category {
-  _id: string;
+  id: string;
   name: string;
 }
 
@@ -39,9 +39,9 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({ filters, updat
         </li>
         {categories.map((category) => (
           <li 
-            key={category._id}
-            className={`category-item ${filters.categoryId === category._id ? 'active' : ''}`}
-            onClick={() => updateFilter('categoryId', category._id)}
+            key={category.id}
+            className={`category-item ${filters.categoryId === category.id ? 'active' : ''}`}
+            onClick={() => updateFilter('categoryId', category.id)}
           >
             <span>{category.name}</span>
           </li>

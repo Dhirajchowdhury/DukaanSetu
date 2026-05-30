@@ -798,9 +798,9 @@ const ConnectFeature = () => {
                     const isBestPrice = minPrice > 0 && minPrice === overallMinPrice;
                     const isTrending = totalProducts > 0 && totalProducts === maxCount;
 
-                    const shortLoc = (profile.city && profile.state)
-                      ? `${profile.city}, ${profile.state}`
-                      : (profile.location_name || profile.wholesaler?.location_name || addressVal);
+                    const shortLoc = hasS
+                      ? ((profile.city && profile.state) ? `${profile.city}, ${profile.state}` : (profile.location_name || profile.wholesaler?.location_name || addressVal))
+                      : "🌍 Pan-India supplier";
 
                     return (
                       <div 
@@ -851,10 +851,10 @@ const ConnectFeature = () => {
                                 <span>📍</span> <span className="line-clamp-1" title={shortLoc}>{shortLoc}</span>
                               </p>
                               <p style={{ margin: '4px 0', fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <span>📦</span> <span>{totalProducts} products</span>
+                                <span>📦</span> <span>{totalProducts > 0 ? `${totalProducts} products` : "No products yet"}</span>
                               </p>
                               <p style={{ margin: '4px 0', fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <span>💰</span> <span>₹{minPrice} - ₹{maxPrice}</span>
+                                <span>💰</span> <span>{totalProducts > 0 ? `₹${minPrice} - ₹${maxPrice}` : "N/A"}</span>
                               </p>
                               {distance !== null && (
                                 <div style={{ marginTop: 6 }}>
@@ -912,7 +912,7 @@ const ConnectFeature = () => {
                                   </div>
                                 ))
                               ) : (
-                                <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '8px 0 0 0', textAlign: 'center' }}>No products listed</p>
+                                <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '8px 0 0 0', textAlign: 'center' }}>No products yet</p>
                               )}
                             </div>
 
@@ -1006,7 +1006,7 @@ const ConnectFeature = () => {
                       </span>
                       <span>•</span>
                       <span className="flex items-center gap-1">
-                        <FiMapPin className="text-primary" /> {(sellerProfile.city && sellerProfile.state) ? `${sellerProfile.city}, ${sellerProfile.state}` : (sellerProfile.location_name || sellerProfile.address || 'Pan India')}
+                        <FiMapPin className="text-primary" /> {sellerProfile.latitude != null && sellerProfile.longitude != null ? ((sellerProfile.city && sellerProfile.state) ? `${sellerProfile.city}, ${sellerProfile.state}` : (sellerProfile.location_name || sellerProfile.address || 'Pan India')) : "🌍 Pan-India supplier"}
                       </span>
                       {/* Show maps verified status */}
                       {sellerProfile.latitude && sellerProfile.longitude && (

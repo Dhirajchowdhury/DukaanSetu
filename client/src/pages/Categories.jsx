@@ -20,7 +20,7 @@ const CategoryModal = ({ category, onClose, onSaved }) => {
     setLoading(true);
     try {
       if (category) {
-        await api.put(`/categories/${category._id}`, { name, icon });
+        await api.put(`/categories/${category.id}`, { name, icon });
         toast.success('Category updated');
       } else {
         await api.post('/categories', { name, icon });
@@ -92,7 +92,7 @@ const Categories = () => {
   const handleDelete = async (cat) => {
     if (!window.confirm(`Delete "${cat.name}"?`)) return;
     try {
-      await api.delete(`/categories/${cat._id}`);
+      await api.delete(`/categories/${cat.id}`);
       toast.success('Category deleted');
       fetchCategories();
     } catch (err) {
@@ -129,7 +129,7 @@ const Categories = () => {
         ) : (
           <div className="cat-grid">
             {categories.map(cat => (
-              <div key={cat._id} className="cat-card card">
+              <div key={cat.id} className="cat-card card">
                 <div className="cat-card__icon">{cat.icon}</div>
                 <div className="cat-card__body">
                   <p className="cat-card__name">{cat.name}</p>

@@ -126,33 +126,7 @@ const discoverProfiles = async (req, res, next) => {
       maxDistance, city,
     } = req.query;
 
-    let query = supabase
-      .from('users')
-      .select(`
-        *,
-        wholesaler_products:wholesaler_products(*)
-      `)
-      .in('role', ['wholesaler', 'distributor', 'producer']);
-
-    if (role && role !== 'all' && role !== '') {
-      query = query.eq('role', role);
-    }
-
-    const { data: users, error } = await query;
-    if (error) throw error;
-
-    // Fetch user's connections to check connectivity in discovery
-    const { data: userConns } = await supabase
-      .from('connections')
-      .or(`shop_owner_id.eq.${req.user.id},wholesaler_id.eq.${req.user.id}`);
-
-    const connectedSet = new Set();
-    (userConns || []).forEach(c => {
-      connectedSet.add(c.shop_owner_id === req.user.id ? c.wholesaler_id : c.shop_owner_id);
-    });
-
-    // Post-process and filter in memory
-    let profiles = [];
+    console.log("[B2B DISCOVER] Query parameters received:", req.query);
 
     const searchLower = search ? search.toLowerCase() : null;
     const categoryLower = category ? category.toLowerCase() : null;
@@ -162,11 +136,72 @@ const discoverProfiles = async (req, res, next) => {
 
     const hasCatalogFilters = !!(searchLower || categoryLower || minP !== null || maxP !== null);
 
+    // Build optimized database query string
+    let selectString = `
+      *,
+      wholesaler_products:wholesaler_products(*)
+    `;
+
+    // Move basic product existence filter to DB query using !inner join when catalog filters are active
+    if (hasCatalogFilters) {
+      selectString = `
+        *,
+        wholesaler_products:wholesaler_products!inner(*)
+      `;
+    }
+
+    let query = supabase
+      .from('users')
+      .select(selectString)
+      .in('role', ['wholesaler', 'distributor', 'producer']);
+
+    // Move basic role filter to DB query
+    if (role && role !== 'all' && role !== '') {
+      query = query.eq('role', role);
+    }
+
+    // Move basic catalog filters directly to DB query
+    if (categoryLower) {
+      query = query.ilike('wholesaler_products.category', `%${category}%`);
+    }
+    if (minP !== null) {
+      query = query.gte('wholesaler_products.price_per_unit', minP);
+    }
+    if (maxP !== null) {
+      query = query.lte('wholesaler_products.price_per_unit', maxP);
+    }
+
+    const { data: users, error } = await query;
+    if (error) {
+      console.error("[B2B DISCOVER] users query failed:", error);
+      throw error;
+    }
+
+    // Log count before filtering
+    console.log(`[B2B DISCOVER] Suppliers count before filtering: ${users ? users.length : 0}`);
+
+    // Fetch connections using correct Supabase columns
+    const { data: userConns, error: connErr } = await supabase
+      .from('connections')
+      .select('*')
+      .or(`user_id.eq.${req.user.id},connected_user_id.eq.${req.user.id}`);
+
+    if (connErr) {
+      console.warn("[B2B DISCOVER] Supabase connections query encountered an error:", connErr.message);
+    }
+
+    const connectedSet = new Set();
+    (userConns || []).forEach(c => {
+      connectedSet.add(c.user_id === req.user.id ? c.connected_user_id : c.user_id);
+    });
+
+    let profiles = [];
+
     (users || []).forEach(user => {
-      // Get active products (stock_available > 0)
+      // Product join existence: active products (stock_available > 0)
       let products = (user.wholesaler_products || []).filter(p => p.stock_available > 0);
 
-      // Apply product and search filters
+      // Search matching logic on product and shop name
       let matchesSearch = false;
       if (searchLower) {
         if (user.shop_name?.toLowerCase().includes(searchLower)) {
@@ -191,12 +226,12 @@ const discoverProfiles = async (req, res, next) => {
         products = products.filter(p => p.price_per_unit <= maxP);
       }
 
-      // If active catalog filters, and no products matched and the shop name didn't match search, exclude
+      // Ensure zero product count doesn't hide supplier unless catalog searching is active
       if (hasCatalogFilters && products.length === 0 && !matchesSearch) {
         return;
       }
 
-      // Location text filter (check user's address or product's location)
+      // Text-based location filters
       if (locationLower) {
         const addressMatch = user.address?.toLowerCase().includes(locationLower);
         const productLocationMatch = products.some(p => p.location?.toLowerCase().includes(locationLower));
@@ -205,7 +240,6 @@ const discoverProfiles = async (req, res, next) => {
         }
       }
 
-      // City filter — use address/location_name since users table has no city column
       if (city) {
         const userLocation = (user.location_name || user.address || '').toLowerCase();
         if (!userLocation.includes(city.toLowerCase())) {
@@ -213,12 +247,12 @@ const discoverProfiles = async (req, res, next) => {
         }
       }
 
-      // Calculate distance
+      // Keep advanced filters (distance proximity calc) in JS
       let distance = null;
-      if (
-        req.user?.latitude && req.user?.longitude &&
-        user.latitude && user.longitude
-      ) {
+      const hasGPS = req.user?.latitude != null && req.user?.longitude != null &&
+                     user.latitude != null && user.longitude != null;
+
+      if (hasGPS) {
         distance = getDistanceKm(
           parseFloat(req.user.latitude),
           parseFloat(req.user.longitude),
@@ -227,8 +261,8 @@ const discoverProfiles = async (req, res, next) => {
         );
       }
 
-      // Max Distance filter
-      if (maxDistance) {
+      // Max Distance filter — only apply if GPS coordinates exist
+      if (maxDistance && hasGPS) {
         const maxD = parseFloat(maxDistance);
         if (distance === null || distance > maxD) {
           return;
@@ -251,13 +285,16 @@ const discoverProfiles = async (req, res, next) => {
         latitude: user.latitude,
         longitude: user.longitude,
         address: user.address,
-        city: null,
-        state: null,
+        city: user.city || null,
+        state: user.state || null,
         is_profile_complete: user.is_profile_complete,
         isConnected: connectedSet.has(user.id),
         total_products: products.length,
         min_price: minPriceVal === Infinity ? 0 : minPriceVal,
         max_price: maxPriceVal === -Infinity ? 0 : maxPriceVal,
+        // Flags for UI predictability and defensive fallbacks
+        hasProducts: products.length > 0,
+        hasLocation: user.latitude != null && user.longitude != null,
         // Backward compatibility:
         wholesaler: {
           id: user.id,
@@ -266,8 +303,8 @@ const discoverProfiles = async (req, res, next) => {
           latitude: user.latitude,
           longitude: user.longitude,
           address: user.address,
-          city: null,
-          state: null,
+          city: user.city || null,
+          state: user.state || null,
           is_profile_complete: user.is_profile_complete,
         },
         productCount: products.length,
@@ -282,9 +319,13 @@ const discoverProfiles = async (req, res, next) => {
       });
     });
 
+    // Log count after filtering
+    console.log(`[B2B DISCOVER] Suppliers count after filtering: ${profiles.length}`);
+
     // Sort
     if (sortBy === 'nearest') {
       profiles.sort((a, b) => {
+        if (a.distance_km === null && b.distance_km === null) return 0;
         if (a.distance_km === null) return 1;
         if (b.distance_km === null) return -1;
         return a.distance_km - b.distance_km;
@@ -394,6 +435,9 @@ const getRecommended = async (req, res, next) => {
         min_price: minPriceVal === Infinity ? 0 : minPriceVal,
         max_price: maxPriceVal === -Infinity ? 0 : maxPriceVal,
         isConnected: connectedSet.has(user.id),
+        // Flags for UI predictability and defensive fallbacks
+        hasProducts: products.length > 0,
+        hasLocation: user.latitude != null && user.longitude != null,
         // Backward compatibility:
         wholesaler: {
           id: user.id,

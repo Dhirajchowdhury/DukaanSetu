@@ -122,7 +122,7 @@ const ProductTable = ({ compact = false }) => {
             >
               <option value="">All Categories</option>
               {(categories || []).map(c => (
-                <option key={c.id || c._id} value={c.id || c._id}>{c.icon} {c.name}</option>
+                <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
               ))}
             </select>
             <select
@@ -181,7 +181,7 @@ const ProductTable = ({ compact = false }) => {
               </thead>
               <tbody>
                 {(products || []).map(product => (
-                  <tr key={product.id || product._id}>
+                  <tr key={product.id}>
                     <td>
                       <div className="pt-product-cell">
                         <div className="pt-product-name">{product.productName}</div>
@@ -225,7 +225,7 @@ const ProductTable = ({ compact = false }) => {
                         <button
                           className="btn-icon pt-btn-delete"
                           title="Delete"
-                          onClick={() => handleDelete(product.id || product._id)}
+                          onClick={() => handleDelete(product.id)}
                         >
                           <FiTrash2 />
                         </button>
