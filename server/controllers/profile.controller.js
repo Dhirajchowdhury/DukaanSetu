@@ -532,22 +532,26 @@ const getTrending = async (req, res, next) => {
 };
 
 const getSellerProfile = async (req, res, next) => {
-  try {
-    const userId = req.params.id || req.params.userId;
-    const isDev = process.env.NODE_ENV !== 'production';
+  const crypto = require('crypto');
+  const reqId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+  const profileId = req.params.id;
 
-    if (isDev) {
-      console.log(`[getSellerProfile] Fetching profile for id: ${userId}`);
+  console.log(`[API REQUEST ${reqId}] GET /api/profile/${profileId}`);
+
+  try {
+    if (!profileId) {
+      console.log(`[API REQUEST ${reqId}] Error: Profile ID parameter is missing`);
+      return res.status(400).json({ message: 'Profile ID is required' });
     }
 
     const userFetch = supabase.from('users')
       .select('id, email, shop_name, role, latitude, longitude, address, city, state, is_profile_complete, created_at')
-      .eq('id', userId)
+      .eq('id', profileId)
       .single();
 
     const listingsFetch = supabase.from('wholesaler_products')
       .select('*')
-      .eq('wholesaler_id', userId)
+      .eq('wholesaler_id', profileId)
       .gt('stock_available', 0)
       .order('price_per_unit', { ascending: true });
 
@@ -561,36 +565,31 @@ const getSellerProfile = async (req, res, next) => {
       connFetch
     ]);
 
+    console.log(`[API REQUEST ${reqId}] Supabase user query response:`, { seller, error: sErr });
+    console.log(`[API REQUEST ${reqId}] Supabase listings query response count:`, listings ? listings.length : 0, { error: lErr });
+
     if (sErr || !seller) {
-      if (isDev) {
-        console.error(`[getSellerProfile] User not found for id: ${userId}`, sErr);
-      }
+      console.error(`[API REQUEST ${reqId}] User not found for id: ${profileId}`, sErr);
       return res.status(404).json({ message: 'User not found' });
     }
     if (lErr) {
-      if (isDev) {
-        console.error(`[getSellerProfile] Listings fetch error for id: ${userId}`, lErr);
-      }
+      console.error(`[API REQUEST ${reqId}] Listings fetch error for id: ${profileId}`, lErr);
       throw lErr;
     }
 
     const currentUserId = req.user?.id;
     const isConnected = currentUserId
       ? (conn || []).some(c => 
-          (c.user_id === currentUserId && c.connected_user_id === userId) ||
-          (c.user_id === userId && c.connected_user_id === currentUserId)
+          (c.user_id === currentUserId && c.connected_user_id === profileId) ||
+          (c.user_id === profileId && c.connected_user_id === currentUserId)
         )
       : false;
 
-    if (isDev) {
-      console.log(`[getSellerProfile] Successfully fetched profile for ${seller.shop_name}`);
-    }
+    console.log(`[API REQUEST ${reqId}] Successfully fetched profile for ${seller.shop_name}, connected: ${isConnected}`);
 
     res.json({ seller: { ...seller, isConnected }, listings: listings || [] });
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error("[getSellerProfile] Error:", error);
-    }
+    console.error(`[API REQUEST ${reqId}] Error in getSellerProfile:`, error);
     next(error);
   }
 };

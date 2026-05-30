@@ -130,14 +130,13 @@ const SupplierCard = React.memo(({
 
   const city = profile.city || profile.wholesaler?.city;
   const state = profile.state || profile.wholesaler?.state;
-  const locationName = profile.locationName || profile.wholesaler?.locationName || profile.location_name || profile.wholesaler?.location_name;
-  const address = profile.address || profile.wholesaler?.address;
+  const lat = profile.latitude || profile.wholesaler?.latitude;
+  const lng = profile.longitude || profile.wholesaler?.longitude;
 
   const cardLocation =
     (city && state && `${city}, ${state}`) ||
     city ||
-    locationName ||
-    address ||
+    (lat && lng && "📍 Location available") ||
     "🌍 Pan-India supplier";
 
   return (
@@ -145,6 +144,7 @@ const SupplierCard = React.memo(({
       className="profile-card"
       onClick={() => {
         if (!profile?.id) return;
+        console.log(`[DEBUG] SupplierCard click - profile.id before navigation:`, profile.id);
         navigate(`/profile/${profile.id}`);
       }}
       style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}
@@ -249,6 +249,7 @@ const SupplierCard = React.memo(({
           onClick={(e) => {
             e.stopPropagation();
             if (!profile?.id) return;
+            console.log(`[DEBUG] View Profile button click - profile.id before navigation:`, profile.id);
             onViewProfile(profile.id);
           }}
         >
@@ -746,10 +747,12 @@ const ConnectFeature = () => {
   const fetchMessages = async (convId, showSpinner = true) => {
     if (showSpinner) setMessagesLoading(true);
     try {
-      const { data } = await api.get(`/chat/conversations/${convId}/messages`);
+      console.log(`[Messaging] Fetching messages for conversation: ${convId}`);
+      const { data } = await api.get(`/messages/${convId}`);
+      console.log(`[Messaging] Messages fetched successfully:`, data.messages ? data.messages.length : 0);
       setMessages(data.messages || []);
     } catch (error) {
-      console.error(error);
+      console.error('[Messaging] Error fetching messages:', error);
     } finally {
       if (showSpinner) setMessagesLoading(false);
     }
@@ -763,12 +766,45 @@ const ConnectFeature = () => {
     setNewMessage(''); // optimistic UI clear
 
     try {
-      const { data } = await api.post(`/chat/conversations/${activeConv.id}/messages`, {
-        message: messageText
+      let convId = activeConv?.id;
+      if (!convId) {
+        const partner = getChatPartner(activeConv) || sellerProfile;
+        if (partner?.id) {
+          console.log(`[Messaging] Conversation ID missing. Creating conversation first with partner ID: ${partner.id}`);
+          const { data: convData } = await api.post('/conversations', { otherUserId: partner.id });
+          convId = convData.conversation?.id;
+          setActiveConv(convData.conversation);
+          console.log(`[Messaging] Conversation created successfully: ${convId}`);
+        }
+      }
+
+      if (!convId) {
+        throw new Error("No active conversation found or could be created");
+      }
+
+      console.log(`[Messaging] Sending message to POST /api/messages. Payload:`, {
+        conversation_id: convId,
+        sender_id: user?.id,
+        content: messageText
       });
-      // Append sent message locally
-      setMessages(prev => [...prev, data.message]);
+
+      const { data } = await api.post('/messages', {
+        conversation_id: convId,
+        sender_id: user?.id,
+        content: messageText
+      });
+
+      console.log(`[Messaging] Message sent successfully. Response:`, data);
+
+      const msgObj = data.message || {
+        id: data.id || Math.random().toString(),
+        text: messageText,
+        sender_id: user?.id,
+        created_at: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, msgObj]);
     } catch (error) {
+      console.error('[Messaging] Failed to send message:', error);
       toast.error('Failed to send message');
       setNewMessage(messageText); // restore text
     }
@@ -894,9 +930,11 @@ const ConnectFeature = () => {
     const locationName = sellerProfile?.location_name || sellerProfile?.locationName;
     const address = sellerProfile?.address;
 
-    const sellerLoc = hasGPS
-      ? ((city && state) ? `${city}, ${state}` : (locationName || address || 'Verified Location'))
-      : "🌍 Pan-India supplier";
+    const sellerLoc =
+      (city && state && `${city}, ${state}`) ||
+      city ||
+      (lat && lng && "📍 Location available") ||
+      "🌍 Pan-India supplier";
 
     const listings = sellerListings || [];
 

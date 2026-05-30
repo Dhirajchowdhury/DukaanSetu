@@ -177,64 +177,94 @@ const getMessages = async (req, res, next) => {
  * body: { conversationId, otherUserId, text }
  */
 const sendMessage = async (req, res, next) => {
-  try {
-    const { conversationId, otherUserId, text } = req.body;
-    let targetConvId = conversationId;
+  const crypto = require('crypto');
+  const reqId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+  console.log(`[API REQUEST ${reqId}] POST /api/messages body:`, req.body);
 
-    const messageText = text || req.body.message;
-    if (!messageText?.trim()) return res.status(400).json({ message: 'Message cannot be empty' });
+  try {
+    const conversation_id = req.body.conversation_id || req.body.conversationId;
+    const sender_id = req.body.sender_id || req.user?.id;
+    const content = req.body.content || req.body.text || req.body.message;
+    const otherUserId = req.body.otherUserId;
+
+    let targetConvId = conversation_id;
+    const messageText = content;
+
+    if (!messageText?.trim()) {
+      console.log(`[API REQUEST ${reqId}] Error: Message cannot be empty`);
+      return res.status(400).json({ message: 'Message cannot be empty' });
+    }
 
     if (!targetConvId && !otherUserId) {
-      return res.status(400).json({ message: 'conversationId or otherUserId is required' });
+      console.log(`[API REQUEST ${reqId}] Error: conversation_id or otherUserId is required`);
+      return res.status(400).json({ message: 'conversation_id or otherUserId is required' });
     }
 
     let otherId = otherUserId;
 
     if (targetConvId) {
-      const { data: conv } = await supabase
+      const { data: conv, error: convErr } = await supabase
         .from('conversations')
         .select('id, user1_id, user2_id')
         .eq('id', targetConvId)
         .maybeSingle();
 
-      if (!conv) return res.status(404).json({ message: 'Conversation not found' });
-      if (conv.user1_id !== req.user.id && conv.user2_id !== req.user.id) {
+      console.log(`[API REQUEST ${reqId}] Supabase conversation response:`, { conv, convErr });
+
+      if (convErr) throw convErr;
+      if (!conv) {
+        return res.status(404).json({ message: 'Conversation not found' });
+      }
+      if (conv.user1_id !== sender_id && conv.user2_id !== sender_id) {
         return res.status(403).json({ message: 'Not authorized' });
       }
-      otherId = conv.user1_id === req.user.id ? conv.user2_id : conv.user1_id;
+      otherId = conv.user1_id === sender_id ? conv.user2_id : conv.user1_id;
     }
 
     // Verify connection exists between users
-    const [u1, u2] = [req.user.id, otherId].sort();
-    const { data: conn } = await supabase
+    const [u1, u2] = [sender_id, otherId].sort();
+    const { data: conn, error: connErr } = await supabase
       .from('connections')
       .select('id')
       .eq('user_id', u1)
       .eq('connected_user_id', u2)
       .maybeSingle();
 
+    console.log(`[API REQUEST ${reqId}] Supabase connection response:`, { conn, connErr });
+
+    if (connErr) throw connErr;
     if (!conn) {
       return res.status(403).json({ message: 'You can only message users you are connected with.' });
     }
 
     if (!targetConvId) {
       // Auto-create conversation if it doesn't exist
-      targetConvId = await getOrCreateConversation(req.user.id, otherId);
+      targetConvId = await getOrCreateConversation(sender_id, otherId);
+      console.log(`[API REQUEST ${reqId}] Auto-created conversation:`, targetConvId);
     }
 
-    const { data: msg, error } = await supabase
+    const { data: msg, error: msgErr } = await supabase
       .from('messages')
       .insert({
         conversation_id: targetConvId,
-        sender_id:       req.user.id,
+        sender_id:       sender_id,
         text:            messageText.trim(),
       })
       .select('id, text, sender_id, created_at')
       .single();
 
-    if (error) throw error;
-    res.status(201).json({ message: msg });
+    console.log(`[API REQUEST ${reqId}] Supabase message insert response:`, { msg, msgErr });
+
+    if (msgErr) throw msgErr;
+    
+    res.status(201).json({ 
+      message: msg,
+      conversation_id: targetConvId,
+      sender_id: sender_id,
+      content: msg.text
+    });
   } catch (error) {
+    console.error(`[API REQUEST ${reqId}] Error sending message:`, error);
     next(error);
   }
 };

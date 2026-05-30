@@ -112,7 +112,12 @@ const Connections = () => {
                     
                     <div className="connection-card-location">
                       <FiMapPin className="text-primary flex-shrink-0" />
-                      <span className="line-clamp-1">{(otherUser.city && otherUser.state) ? `${otherUser.city}, ${otherUser.state}` : (otherUser.location_name || otherUser.address || 'Pan India')}</span>
+                      <span className="line-clamp-1">
+                        {(otherUser.city && otherUser.state && `${otherUser.city}, ${otherUser.state}`) ||
+                          otherUser.city ||
+                          (otherUser.latitude && otherUser.longitude && "📍 Location available") ||
+                          "🌍 Pan-India supplier"}
+                      </span>
                     </div>
                   </div>
                   
@@ -126,7 +131,11 @@ const Connections = () => {
                     </button>
                     
                     <button 
-                      onClick={() => navigate(`/connect/profile/${otherUser.id}`)}
+                      onClick={() => {
+                        if (!otherUser?.id) return;
+                        console.log(`[DEBUG] Connection profile navigation - otherUser.id before navigation:`, otherUser.id);
+                        navigate(`/profile/${otherUser.id}`);
+                      }}
                       className="btn btn-secondary btn-sm btn-icon"
                       title="View Seller Profile"
                     >
