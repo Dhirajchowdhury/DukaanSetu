@@ -63,6 +63,54 @@ const protect = async (req, res, next) => {
 };
 
 /**
+ * OptionalProtect — verifies JWT optionally. If present, attaches req.user; otherwise bypasses without error.
+ */
+const optionalProtect = async (req, res, next) => {
+  try {
+    let token;
+
+    if (req.headers.authorization?.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (!token) {
+      return next();
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, email, shop_name, phone_number, role, email_verified, notif_email, notif_sms, latitude, longitude, address, city, state, is_profile_complete, created_at')
+      .eq('id', decoded.id)
+      .single();
+
+    if (!error && user) {
+      req.user = {
+        _id: user.id,
+        id:  user.id,
+        email: user.email,
+        shopName: user.shop_name,
+        phoneNumber: user.phone_number,
+        role: user.role,
+        emailVerified: user.email_verified,
+        latitude: user.latitude,
+        longitude: user.longitude,
+        address: user.address,
+        city: user.city,
+        state: user.state,
+        isProfileComplete: user.is_profile_complete,
+      };
+    }
+
+    next();
+  } catch (error) {
+    // Fail silently and bypass optional authentication
+    next();
+  }
+};
+
+/**
  * requireRole(...roles) — RBAC middleware factory.
  */
 const requireRole = (...roles) => (req, res, next) => {
@@ -75,4 +123,4 @@ const requireRole = (...roles) => (req, res, next) => {
   next();
 };
 
-module.exports = { protect, requireRole };
+module.exports = { protect, optionalProtect, requireRole };

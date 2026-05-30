@@ -31,6 +31,46 @@ const SkeletonCard = () => (
   </div>
 );
 
+const ProfileSkeleton = () => (
+  <div className="profile-details-skeleton animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: 24, animation: 'skeletonPulse 1.5s infinite' }}>
+    <div style={{ background: '#ffffff', border: '1px solid #f1f5f9', borderRadius: '16px', padding: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 20, alignItems: 'center', flex: '1 1 300px' }}>
+        <div style={{ width: 72, height: 72, borderRadius: 12, background: '#e2e8f0' }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ width: '50%', height: 24, background: '#e2e8f0', borderRadius: 6, marginBottom: 12 }} />
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ width: 100, height: 16, background: '#e2e8f0', borderRadius: 4 }} />
+            <div style={{ width: 150, height: 16, background: '#e2e8f0', borderRadius: 4 }} />
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ width: 120, height: 40, background: '#e2e8f0', borderRadius: 8 }} />
+        <div style={{ width: 120, height: 40, background: '#e2e8f0', borderRadius: 8 }} />
+      </div>
+    </div>
+    <div style={{ width: '220px', height: 20, background: '#e2e8f0', borderRadius: 4, margin: '20px 0 10px' }} />
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 24 }}>
+      {Array.from({ length: 3 }).map((_, idx) => (
+        <div key={idx} style={{ background: '#ffffff', border: '1px solid #f1f5f9', borderRadius: '16px', padding: 20, minHeight: 220, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 16 }}>
+          <div>
+            <div style={{ width: '70%', height: 16, background: '#e2e8f0', borderRadius: 4, marginBottom: 8 }} />
+            <div style={{ width: '40%', height: 12, background: '#e2e8f0', borderRadius: 4 }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #f8fafc', paddingTop: 12 }}>
+            <div style={{ width: '40%', height: 24, background: '#e2e8f0', borderRadius: 4 }} />
+            <div style={{ width: '30%', height: 18, background: '#e2e8f0', borderRadius: 4 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 12, borderTop: '1px solid #f8fafc', paddingTop: 12 }}>
+            <div style={{ flex: 1, height: 32, background: '#e2e8f0', borderRadius: 6 }} />
+            <div style={{ flex: 1, height: 32, background: '#e2e8f0', borderRadius: 6 }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 const computeB2BScore = (profile) => {
   let score = 0;
   const totalProducts = profile.total_products !== undefined ? profile.total_products : (profile.productCount !== undefined ? profile.productCount : 0);
@@ -76,7 +116,6 @@ const SupplierCard = React.memo(({
   isClosest,
   isBestPrice,
   isTrending,
-  shortLoc,
   formatRoleLabel,
   navigate,
   id
@@ -89,16 +128,25 @@ const SupplierCard = React.memo(({
   const distance = profile.distance_km !== undefined ? profile.distance_km : (profile.distance !== undefined ? profile.distance : null);
   const isConnected = profile.isConnected;
 
-  // Generate a stable B2B connection count based on name length & id charcodes
-  const connectionCount = useMemo(() => {
-    const seed = (id || 'setu').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return (seed % 28) + 7; // Generates a realistic connection number between 7 and 35
-  }, [id]);
+  const city = profile.city || profile.wholesaler?.city;
+  const state = profile.state || profile.wholesaler?.state;
+  const locationName = profile.locationName || profile.wholesaler?.locationName || profile.location_name || profile.wholesaler?.location_name;
+  const address = profile.address || profile.wholesaler?.address;
+
+  const cardLocation =
+    (city && state && `${city}, ${state}`) ||
+    city ||
+    locationName ||
+    address ||
+    "🌍 Pan-India supplier";
 
   return (
     <div 
       className="profile-card"
-      onClick={() => navigate(`/connect/profile/${id}`)}
+      onClick={() => {
+        if (!profile?.id) return;
+        navigate(`/profile/${profile.id}`);
+      }}
       style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}
     >
       <div>
@@ -145,7 +193,7 @@ const SupplierCard = React.memo(({
         <div className="profile-card__body body" style={{ marginTop: 12 }}>
           <p className="profile-card__meta" style={{ margin: '6px 0', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)' }}>
             <span style={{ fontSize: '14px' }}>📍</span>
-            <span className="line-clamp-1" title={shortLoc}>{shortLoc}</span>
+            <span className="line-clamp-1" title={cardLocation}>{cardLocation}</span>
           </p>
           <p style={{ margin: '6px 0', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)' }}>
             <span style={{ fontSize: '14px' }}>📦</span>
@@ -169,10 +217,6 @@ const SupplierCard = React.memo(({
             <span className="trust-dot trust-dot--active"></span>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
               Active this week
-            </span>
-            <span style={{ color: 'var(--border)', fontSize: '10px' }}>•</span>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
-              {connectionCount} connections
             </span>
           </div>
         </div>
@@ -202,7 +246,11 @@ const SupplierCard = React.memo(({
         <button
           className="btn btn-secondary btn-sm"
           style={{ width: "100%", justifyContent: "center", height: '36px' }}
-          onClick={(e) => { e.stopPropagation(); onViewProfile(id); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!profile?.id) return;
+            onViewProfile(profile.id);
+          }}
         >
           View Profile
         </button>
@@ -265,6 +313,7 @@ const ConnectFeature = () => {
   const [sellerProfile, setSellerProfile] = useState(null);
   const [sellerListings, setSellerListings] = useState([]);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [profileCache, setProfileCache] = useState({});
 
   // Chat System states
   const [conversations, setConversations] = useState([]);
@@ -511,6 +560,18 @@ const ConnectFeature = () => {
     try {
       await api.post(`/connections/${otherUserId}`);
       toast.success('Connected successfully!', { id: loadingToastId });
+
+      // Update in-memory profile cache
+      setProfileCache(prev => {
+        if (!prev[otherUserId]) return prev;
+        return {
+          ...prev,
+          [otherUserId]: {
+            ...prev[otherUserId],
+            seller: { ...prev[otherUserId].seller, isConnected: true }
+          }
+        };
+      });
     } catch (error) {
       console.error(error);
       // Rollback on failure
@@ -592,14 +653,43 @@ const ConnectFeature = () => {
 
   // ── Single Seller Profile details ──
   const viewSellerProfile = async (userId) => {
+    const isDev = process.env.NODE_ENV !== 'production';
     setProfileLoading(true);
     setSelectedSellerId(userId);
+
+    // Evaluate cache hit
+    if (profileCache[userId]) {
+      if (isDev) {
+        console.log(`[viewSellerProfile] Cache hit for id: ${userId}`);
+      }
+      setSellerProfile(profileCache[userId].seller);
+      setSellerListings(profileCache[userId].listings || []);
+      setProfileLoading(false);
+      return;
+    }
+
+    if (isDev) {
+      console.log(`[viewSellerProfile] Cache miss. Fetching profile for id: ${userId}`);
+    }
+
     try {
       const { data } = await api.get(`/profile/${userId}`);
+      if (isDev) {
+        console.log("[viewSellerProfile] API response received:", data);
+      }
+
+      // Store in memory cache
+      setProfileCache(prev => ({
+        ...prev,
+        [userId]: { seller: data.seller, listings: data.listings || [] }
+      }));
+
       setSellerProfile(data.seller);
       setSellerListings(data.listings || []);
     } catch (error) {
-      console.error(error);
+      if (isDev) {
+        console.error("[viewSellerProfile] API error loading seller details:", error);
+      }
       toast.error('Failed to load seller details');
       setSelectedSellerId(null);
       navigate('/connect');
@@ -768,17 +858,202 @@ const ConnectFeature = () => {
           profile={profile}
           onConnect={handleConnectUser}
           onMessage={startChatWithSeller}
-          onViewProfile={(sellerId) => navigate(`/connect/profile/${sellerId}`)}
+          onViewProfile={(sellerId) => navigate(`/profile/${sellerId}`)}
           isClosest={isClosest}
           isBestPrice={isBestPrice}
           isTrending={isTrending}
-          shortLoc={shortLoc}
           formatRoleLabel={formatRoleLabel}
           navigate={navigate}
         />
       );
     });
   }, [sortedProfiles, navigate]);
+
+  // Memoized B2B Single Profile details view to optimize rendering performance and bypass redundant sub-tree renders
+  const sellerProfileView = useMemo(() => {
+    if (!sellerProfile) {
+      return (
+        <div className="card empty-state animate-fade-in" style={{ padding: '40px', textAlign: 'center' }}>
+          <div className="empty-state-icon" style={{ fontSize: '48px', marginBottom: '16px' }}>👤</div>
+          <h3>Profile not found</h3>
+          <p style={{ color: 'var(--text-secondary)' }}>The requested supplier profile could not be loaded or does not exist.</p>
+          <button onClick={() => setSelectedSellerId(null)} className="btn btn-primary" style={{ marginTop: '16px' }}>
+            Return to Directory
+          </button>
+        </div>
+      );
+    }
+
+    const shopName = sellerProfile?.shop_name || 'Verified Supplier';
+    const role = sellerProfile?.role || '';
+    const lat = sellerProfile?.latitude;
+    const lng = sellerProfile?.longitude;
+    const hasGPS = lat != null && lng != null;
+    const city = sellerProfile?.city;
+    const state = sellerProfile?.state;
+    const locationName = sellerProfile?.location_name || sellerProfile?.locationName;
+    const address = sellerProfile?.address;
+
+    const sellerLoc = hasGPS
+      ? ((city && state) ? `${city}, ${state}` : (locationName || address || 'Verified Location'))
+      : "🌍 Pan-India supplier";
+
+    const listings = sellerListings || [];
+
+    return (
+      <div className="animate-fade-in">
+        {/* Profile Hero Header Card */}
+        <div className="profile-details__hero">
+          <div className="profile-details__info">
+            <div className="profile-details__shop-icon">
+              {shopName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <h2 className="profile-details__name">{shopName}</h2>
+              <div className="profile-details__meta">
+                <span className="badge badge-accent">
+                  {formatRoleLabel(role)}
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <FiMapPin className="text-primary" /> {sellerLoc}
+                </span>
+                {/* Show maps verified status */}
+                {hasGPS && (
+                  <>
+                    <span>•</span>
+                    <span className="badge badge-primary font-bold">
+                      📍 Verified Location
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="profile-details__actions">
+            {/* View on Map CTA */}
+            {hasGPS ? (
+              <a 
+                href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="btn btn-secondary"
+                style={{ textDecoration: 'none', gap: 6 }}
+                title="View exact shop location"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FiMap /> View Location
+              </a>
+            ) : (
+              <div style={{ display: 'inline-block', position: 'relative' }} title="Seller's GPS coordinates are unset">
+                <button 
+                  disabled
+                  className="btn btn-secondary"
+                  style={{ opacity: 0.5, cursor: 'not-allowed', gap: 6 }}
+                >
+                  <FiMap /> View Location (Disabled) <FiInfo style={{ marginLeft: 4 }} />
+                </button>
+              </div>
+            )}
+
+            {/* Message / Connect CTA */}
+            {sellerProfile?.isConnected ? (
+              <button 
+                onClick={(e) => { e.stopPropagation(); startChatWithSeller(sellerProfile?.id); }}
+                className="btn btn-primary"
+                style={{ gap: 6 }}
+              >
+                <FiMessageSquare /> Message
+              </button>
+            ) : (
+              <button 
+                onClick={(e) => { e.stopPropagation(); handleConnectProfileUser(e, sellerProfile?.id); }}
+                className="btn btn-primary"
+                style={{ gap: 6 }}
+                disabled={connectingUsers[sellerProfile?.id]}
+              >
+                {connectingUsers[sellerProfile?.id] ? (
+                  <>
+                    <span className="spinner spinner-xs" /> Connecting...
+                  </>
+                ) : (
+                  <>🔵 Connect</>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Products by this user */}
+        <h3 className="profile-details__subtitle">
+          <FiPackage className="text-primary" /> Available Products ({listings.length})
+        </h3>
+
+        {listings.length === 0 ? (
+          <div className="card empty-state">
+            <p>This seller hasn't listed any wholesale products yet.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {listings.map((product) => {
+              if (!product) return null;
+              return (
+                <div key={product.id} className="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between" style={{ minHeight: "220px", borderRadius: "16px" }}>
+                  {/* Top: Name, Category, Location */}
+                  <div className="mb-3">
+                    <div className="flex justify-between items-start gap-2 mb-1.5">
+                      <h3 className="text-sm font-bold text-gray-900 line-clamp-2" style={{ margin: 0 }}>{product.product_name}</h3>
+                      <span className="bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full text-[10px] font-bold border border-teal-100 flex-shrink-0">
+                        {product.category}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 flex items-center gap-1" style={{ margin: 0 }}>
+                      <FiMapPin className="text-teal-500" /> {product.location || 'Pan India'}
+                    </p>
+                  </div>
+
+                  {/* Middle: Price, Unit, MOQ */}
+                  <div className="mb-4 pt-3 border-t border-gray-50 flex justify-between items-end">
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold" style={{ margin: 0 }}>Price</p>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-lg font-black text-indigo-600">₹{product.price_per_unit}</span>
+                        <span className="text-xs text-gray-400 font-medium">/ {product.unit || 'unit'}</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded text-[10px] font-bold border border-indigo-100">
+                        MOQ: {product.moq} {product.unit || 'units'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Bottom: Buttons */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 'auto' }}>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); triggerInquiryModal(product); }}
+                      className="btn btn-secondary btn-sm"
+                      style={{ width: '100%', justifyContent: 'center' }}
+                    >
+                      Inquire
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); triggerOrderModal(e, product); }}
+                      className="btn btn-primary btn-sm"
+                      style={{ width: '100%', justifyContent: 'center' }}
+                    >
+                      Order
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }, [sellerProfile, sellerListings, connectingUsers, routeSellerId]);
 
   return (
     <div className="connect-container">
@@ -1082,162 +1357,9 @@ const ConnectFeature = () => {
           </div>
 
           {profileLoading ? (
-            <div className="loading-center">
-              <div className="spinner spinner-lg" />
-              <p>Fetching profile details…</p>
-            </div>
-          ) : !sellerProfile ? (
-            <div className="card empty-state">
-              <h3>Profile not found</h3>
-            </div>
+            <ProfileSkeleton />
           ) : (
-            <div>
-              {/* Profile Hero Header Card */}
-              <div className="profile-details__hero">
-                <div className="profile-details__info">
-                  <div className="profile-details__shop-icon">
-                    {sellerProfile.shop_name.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h2 className="profile-details__name">{sellerProfile.shop_name}</h2>
-                    <div className="profile-details__meta">
-                      <span className="badge badge-accent">
-                        {formatRoleLabel(sellerProfile.role)}
-                      </span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <FiMapPin className="text-primary" /> {sellerProfile.latitude != null && sellerProfile.longitude != null ? ((sellerProfile.city && sellerProfile.state) ? `${sellerProfile.city}, ${sellerProfile.state}` : (sellerProfile.location_name || sellerProfile.address || 'Pan India')) : "🌍 Pan-India supplier"}
-                      </span>
-                      {/* Show maps verified status */}
-                      {sellerProfile.latitude && sellerProfile.longitude && (
-                        <>
-                          <span>•</span>
-                          <span className="badge badge-primary font-bold">
-                            📍 Verified Location
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="profile-details__actions">
-                  {/* View on Map CTA */}
-                  {sellerProfile.latitude && sellerProfile.longitude ? (
-                    <a 
-                      href={`https://www.google.com/maps/search/?api=1&query=${sellerProfile.latitude},${sellerProfile.longitude}`}
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="btn btn-secondary"
-                      style={{ textDecoration: 'none', gap: 6 }}
-                      title="View exact shop location"
-                    >
-                      <FiMap /> View Location
-                    </a>
-                  ) : (
-                    <div style={{ display: 'inline-block', position: 'relative' }} title="Seller's GPS coordinates are unset">
-                      <button 
-                        disabled
-                        className="btn btn-secondary"
-                        style={{ opacity: 0.5, cursor: 'not-allowed', gap: 6 }}
-                      >
-                        <FiMap /> View Location (Disabled) <FiInfo style={{ marginLeft: 4 }} />
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Message / Connect CTA */}
-                  {sellerProfile.isConnected ? (
-                    <button 
-                      onClick={() => startChatWithSeller(sellerProfile.id)}
-                      className="btn btn-primary"
-                      style={{ gap: 6 }}
-                    >
-                      <FiMessageSquare /> Message
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={(e) => handleConnectProfileUser(e, sellerProfile.id)}
-                      className="btn btn-primary"
-                      style={{ gap: 6 }}
-                      disabled={connectingUsers[sellerProfile.id]}
-                    >
-                      {connectingUsers[sellerProfile.id] ? (
-                        <>
-                          <span className="spinner spinner-xs" /> Connecting...
-                        </>
-                      ) : (
-                        <>🔵 Connect</>
-                      )}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Products by this user */}
-              <h3 className="profile-details__subtitle">
-                <FiPackage className="text-primary" /> Available Products ({sellerListings.length})
-              </h3>
-
-              {sellerListings.length === 0 ? (
-                <div className="card empty-state">
-                  <p>This seller hasn't listed any wholesale products yet.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {sellerListings.map((product) => (
-                    <div key={product.id} className="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between" style={{ minHeight: "220px", borderRadius: "16px" }}>
-                      {/* Top: Name, Category, Location */}
-                      <div className="mb-3">
-                        <div className="flex justify-between items-start gap-2 mb-1.5">
-                          <h3 className="text-sm font-bold text-gray-900 line-clamp-2" style={{ margin: 0 }}>{product.product_name}</h3>
-                          <span className="bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full text-[10px] font-bold border border-teal-100 flex-shrink-0">
-                            {product.category}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-400 flex items-center gap-1" style={{ margin: 0 }}>
-                          <FiMapPin className="text-teal-500" /> {product.location || 'Pan India'}
-                        </p>
-                      </div>
-
-                      {/* Middle: Price, Unit, MOQ */}
-                      <div className="mb-4 pt-3 border-t border-gray-50 flex justify-between items-end">
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold" style={{ margin: 0 }}>Price</p>
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-lg font-black text-indigo-600">₹{product.price_per_unit}</span>
-                            <span className="text-xs text-gray-400 font-medium">/ {product.unit || 'unit'}</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded text-[10px] font-bold border border-indigo-100">
-                            MOQ: {product.moq} {product.unit || 'units'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Bottom: Buttons */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 'auto' }}>
-                        <button 
-                          onClick={() => triggerInquiryModal(product)}
-                          className="btn btn-secondary btn-sm"
-                          style={{ width: '100%', justifyContent: 'center' }}
-                        >
-                          Inquire
-                        </button>
-                        <button 
-                          onClick={(e) => triggerOrderModal(e, product)}
-                          className="btn btn-primary btn-sm"
-                          style={{ width: '100%', justifyContent: 'center' }}
-                        >
-                          Order
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            sellerProfileView
           )}
         </div>
       )}

@@ -125,6 +125,9 @@ function App() {
             <Route path="/connect/profile/:id" element={
               <PrivateRoute><Connect /></PrivateRoute>
             } />
+            <Route path="/profile/:id" element={
+              <PrivateRoute><Connect /></PrivateRoute>
+            } />
             <Route path="/connections" element={
               <PrivateRoute><Connections /></PrivateRoute>
             } />

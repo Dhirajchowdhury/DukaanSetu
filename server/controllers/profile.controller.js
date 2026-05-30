@@ -138,14 +138,14 @@ const discoverProfiles = async (req, res, next) => {
 
     // Build optimized database query string
     let selectString = `
-      *,
+      id, email, shop_name, role, latitude, longitude, address, city, state, is_profile_complete, created_at,
       wholesaler_products:wholesaler_products(*)
     `;
 
     // Move basic product existence filter to DB query using !inner join when catalog filters are active
     if (hasCatalogFilters) {
       selectString = `
-        *,
+        id, email, shop_name, role, latitude, longitude, address, city, state, is_profile_complete, created_at,
         wholesaler_products:wholesaler_products!inner(*)
       `;
     }
@@ -375,7 +375,7 @@ const getRecommended = async (req, res, next) => {
     let query = supabase
       .from('users')
       .select(`
-        *,
+        id, email, shop_name, role, latitude, longitude, address, city, state, is_profile_complete, created_at,
         wholesaler_products:wholesaler_products(*)
       `)
       .in('role', ['wholesaler', 'distributor', 'producer']);
@@ -531,35 +531,66 @@ const getTrending = async (req, res, next) => {
   }
 };
 
-/**
- * @desc  Get a single seller's public profile + listings
- * @route GET /api/profile/:userId
- */
 const getSellerProfile = async (req, res, next) => {
   try {
-    const { userId } = req.params;
+    const userId = req.params.id || req.params.userId;
+    const isDev = process.env.NODE_ENV !== 'production';
+
+    if (isDev) {
+      console.log(`[getSellerProfile] Fetching profile for id: ${userId}`);
+    }
+
+    const userFetch = supabase.from('users')
+      .select('id, email, shop_name, role, latitude, longitude, address, city, state, is_profile_complete, created_at')
+      .eq('id', userId)
+      .single();
+
+    const listingsFetch = supabase.from('wholesaler_products')
+      .select('*')
+      .eq('wholesaler_id', userId)
+      .gt('stock_available', 0)
+      .order('price_per_unit', { ascending: true });
+
+    const connFetch = req.user?.id
+      ? supabase.from('connections').select('*').or(`user_id.eq.${req.user.id},connected_user_id.eq.${req.user.id}`)
+      : Promise.resolve({ data: [] });
 
     const [{ data: seller, error: sErr }, { data: listings, error: lErr }, { data: conn }] = await Promise.all([
-      supabase.from('users')
-        .select('id, shop_name, role, latitude, longitude, address, city, state, created_at')
-        .eq('id', userId).single(),
-      supabase.from('wholesaler_products')
-        .select('*').eq('wholesaler_id', userId)
-        .gt('stock_available', 0).order('price_per_unit', { ascending: true }),
-      supabase.from('connections')
-        .or(`user_id.eq.${req.user.id},connected_user_id.eq.${req.user.id}`)
+      userFetch,
+      listingsFetch,
+      connFetch
     ]);
 
-    if (sErr || !seller) return res.status(404).json({ message: 'User not found' });
-    if (lErr) throw lErr;
+    if (sErr || !seller) {
+      if (isDev) {
+        console.error(`[getSellerProfile] User not found for id: ${userId}`, sErr);
+      }
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (lErr) {
+      if (isDev) {
+        console.error(`[getSellerProfile] Listings fetch error for id: ${userId}`, lErr);
+      }
+      throw lErr;
+    }
 
-    const isConnected = (conn || []).some(c => 
-      (c.user_id === req.user.id && c.connected_user_id === userId) ||
-      (c.user_id === userId && c.connected_user_id === req.user.id)
-    );
+    const currentUserId = req.user?.id;
+    const isConnected = currentUserId
+      ? (conn || []).some(c => 
+          (c.user_id === currentUserId && c.connected_user_id === userId) ||
+          (c.user_id === userId && c.connected_user_id === currentUserId)
+        )
+      : false;
+
+    if (isDev) {
+      console.log(`[getSellerProfile] Successfully fetched profile for ${seller.shop_name}`);
+    }
 
     res.json({ seller: { ...seller, isConnected }, listings: listings || [] });
   } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("[getSellerProfile] Error:", error);
+    }
     next(error);
   }
 };
