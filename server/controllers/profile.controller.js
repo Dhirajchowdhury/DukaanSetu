@@ -127,6 +127,7 @@ const discoverProfiles = async (req, res, next) => {
     } = req.query;
 
     console.log("[B2B DISCOVER] Query parameters received:", req.query);
+    console.log("[B2B DISCOVER] req.user:", JSON.stringify({ id: req.user?.id, role: req.user?.role, email: req.user?.email }));
 
     const searchLower = search ? search.toLowerCase() : null;
     const categoryLower = category ? category.toLowerCase() : null;
@@ -134,249 +135,80 @@ const discoverProfiles = async (req, res, next) => {
     const minP = minPrice ? parseFloat(minPrice) : null;
     const maxP = maxPrice ? parseFloat(maxPrice) : null;
 
-    // Build optimized database query string - ALWAYS use left join to prevent excluding users with zero products by default
-    let selectString = `
-      id, email, shop_name, role, latitude, longitude, address, city, state, is_profile_complete, created_at,
-      wholesaler_products:wholesaler_products(*)
-    `;
-
-    let query = supabase
-      .from('users')
-      .select(selectString)
-      .in('role', ['wholesaler', 'distributor', 'producer']);
-
-    // JS-side case-insensitive role filter (DB .eq() is case-sensitive, so we fetch all and filter here)
+    // JS-side case-insensitive role filter
     const supplierType = role && role.toLowerCase() !== 'all' && role.toLowerCase() !== 'all roles' && role !== 'all_roles' && role !== ''
       ? role.toLowerCase()
       : null;
+    console.log(`[B2B DISCOVER] supplierType: ${supplierType}`);
 
-    const { data: users, error } = await query;
-    if (error) {
-      console.error("[B2B DISCOVER] users query failed:", error);
-      throw error;
+    // ── STEP 1: Verify raw data ──────────────────────────────────────────
+    // Fetch ALL supplier-role users (no filters, no joins)
+    const { data: rawUsers, error: rawErr } = await supabase
+      .from('users')
+      .select('id, email, shop_name, role, latitude, longitude, address, city, state, is_profile_complete, created_at')
+      .in('role', ['wholesaler', 'distributor', 'producer']);
+
+    if (rawErr) {
+      console.error("[B2B DISCOVER] RAW users query FAILED:", rawErr);
+      return res.status(500).json({ message: 'DB query failed', error: rawErr });
     }
 
-    // Log total users fetched
-    console.log(`[B2B DISCOVER] Total users fetched from Supabase: ${users ? users.length : 0}`);
-
-    // Fetch connections using correct Supabase columns
-    const { data: userConns, error: connErr } = await supabase
-      .from('connections')
-      .select('*')
-      .or(`user_id.eq.${req.user.id},connected_user_id.eq.${req.user.id}`);
-
-    if (connErr) {
-      console.warn("[B2B DISCOVER] Supabase connections query encountered an error:", connErr.message);
-    }
-
-    const connectedSet = new Set();
-    (userConns || []).forEach(c => {
-      connectedSet.add(c.user_id === req.user.id ? c.connected_user_id : c.user_id);
-    });
-
-    let profiles = [];
-
-    (users || []).forEach(user => {
-      console.log(`[B2B DISCOVER FILTER] Processing user: "${user.shop_name}" (id: ${user.id}, role: ${user.role})`);
-
-      // 1. Exclude self
-      if (user.id === req.user.id) {
-        console.log(`[B2B DISCOVER FILTER] Excluded user "${user.shop_name}" — self`);
-        return;
-      }
-
-      // 2. Role filter — case-insensitive
-      if (supplierType && user.role?.toLowerCase() !== supplierType) {
-        console.log(`[B2B DISCOVER FILTER] Excluded user "${user.shop_name}" — role filter: expected "${supplierType}", got "${user.role}"`);
-        return;
-      }
-
-      // Product join existence: active products (stock_available > 0)
-      let products = (user.wholesaler_products || []).filter(p => p.stock_available > 0);
-
-      // Search matching logic on product and shop name
-      let matchesSearch = true;
-      if (searchLower) {
-        matchesSearch = false;
-        const shopMatch = user.shop_name?.toLowerCase().includes(searchLower);
-        const productMatch = products.some(p =>
-          p.product_name?.toLowerCase().includes(searchLower) ||
-          p.category?.toLowerCase().includes(searchLower)
-        );
-        if (shopMatch || productMatch) {
-          matchesSearch = true;
-        }
-      }
-
-      if (!matchesSearch) {
-        console.log(`[B2B DISCOVER FILTER] Excluded user "${user.shop_name}" — search filter: "${search}" not found in shop name or products`);
-        return;
-      }
-
-      // Catalog filters - only apply to products if catalog searching is active
-      if (categoryLower) {
-        const before = products.length;
-        products = products.filter(p => p.category?.toLowerCase().includes(categoryLower));
-        if (products.length === 0) {
-          console.log(`[B2B DISCOVER FILTER] Excluded user "${user.shop_name}" — category filter: "${category}" matched 0 of ${before} products`);
-          return;
-        }
-      }
-
-      if (minP !== null) {
-        const before = products.length;
-        products = products.filter(p => p.price_per_unit >= minP);
-        if (products.length === 0) {
-          console.log(`[B2B DISCOVER FILTER] Excluded user "${user.shop_name}" — minPrice filter: ${minP} matched 0 of ${before} products`);
-          return;
-        }
-      }
-
-      if (maxP !== null) {
-        const before = products.length;
-        products = products.filter(p => p.price_per_unit <= maxP);
-        if (products.length === 0) {
-          console.log(`[B2B DISCOVER FILTER] Excluded user "${user.shop_name}" — maxPrice filter: ${maxP} matched 0 of ${before} products`);
-          return;
-        }
-      }
-
-      // Text-based location filters
-      if (locationLower) {
-        const addressMatch = user.address?.toLowerCase().includes(locationLower);
-        const cityMatch = user.city?.toLowerCase().includes(locationLower);
-        const stateMatch = user.state?.toLowerCase().includes(locationLower);
-        const productLocationMatch = products.some(p => p.location?.toLowerCase().includes(locationLower));
-        if (!addressMatch && !cityMatch && !stateMatch && !productLocationMatch) {
-          console.log(`[B2B DISCOVER FILTER] Excluded user "${user.shop_name}" — location filter: "${location}" not found in address/city/state or product location`);
-          return;
-        }
-      }
-
-      if (city) {
-        const userCity = (user.city || '').toLowerCase();
-        const userAddress = (user.address || '').toLowerCase();
-        if (!userCity.includes(city.toLowerCase()) && !userAddress.includes(city.toLowerCase())) {
-          console.log(`[B2B DISCOVER FILTER] Excluded user "${user.shop_name}" — city filter: "${city}" not found in city ("${user.city}") or address ("${user.address}")`);
-          return;
-        }
-      }
-
-      // Keep advanced filters (distance proximity calc) in JS
-      let distance = null;
-      const hasGPS = req.user?.latitude != null && req.user?.longitude != null &&
-                     user.latitude != null && user.longitude != null;
-
-      if (hasGPS) {
-        distance = getDistanceKm(
-          parseFloat(req.user.latitude),
-          parseFloat(req.user.longitude),
-          parseFloat(user.latitude),
-          parseFloat(user.longitude)
-        );
-      }
-
-      // Max Distance filter — only apply if BOTH users have GPS coordinates
-      if (maxDistance && hasGPS) {
-        const maxD = parseFloat(maxDistance);
-        if (distance === null || distance > maxD) {
-          console.log(`[B2B DISCOVER FILTER] Excluded user "${user.shop_name}" — maxDistance filter: ${distance}km > ${maxD}km`);
-          return;
-        }
-      } else if (maxDistance && !hasGPS) {
-        console.log(`[B2B DISCOVER FILTER] Skipping distance filter for user "${user.shop_name}" — missing GPS data`);
-      }
-
-      // Calculate price ranges & aggregates
-      let minPriceVal = Infinity;
-      let maxPriceVal = -Infinity;
-      products.forEach(p => {
-        if (p.price_per_unit < minPriceVal) minPriceVal = p.price_per_unit;
-        if (p.price_per_unit > maxPriceVal) maxPriceVal = p.price_per_unit;
-      });
-
-      profiles.push({
-        id: user.id,
-        name: user.shop_name,
-        shop_name: user.shop_name,
-        role: user.role,
-        latitude: user.latitude,
-        longitude: user.longitude,
-        address: user.address,
-        city: user.city || null,
-        state: user.state || null,
-        is_profile_complete: user.is_profile_complete,
-        isConnected: connectedSet.has(user.id),
-        total_products: products.length,
-        min_price: minPriceVal === Infinity ? 0 : minPriceVal,
-        max_price: maxPriceVal === -Infinity ? 0 : maxPriceVal,
-        hasProducts: products.length > 0,
-        hasLocation: user.latitude != null && user.longitude != null,
-        wholesaler: {
-          id: user.id,
-          shop_name: user.shop_name,
-          role: user.role,
-          latitude: user.latitude,
-          longitude: user.longitude,
-          address: user.address,
-          city: user.city || null,
-          state: user.state || null,
-          is_profile_complete: user.is_profile_complete,
-        },
-        productCount: products.length,
-        minPrice: minPriceVal === Infinity ? 0 : minPriceVal,
-        maxPrice: maxPriceVal === -Infinity ? 0 : maxPriceVal,
-        distance: distance !== null ? Math.round(distance * 10) / 10 : null,
-        distance_km: distance !== null ? Math.round(distance * 10) / 10 : null,
-        topProducts: [...products]
-          .sort((a, b) => a.price_per_unit - b.price_per_unit)
-          .slice(0, 3)
-          .map(({ id, product_name, price_per_unit, unit }) => ({ id, product_name, price_per_unit, unit })),
-      });
-    });
-
-    // No fallback — filtering must produce correct results on its own
-
-    // Log count after filtering
-    console.log(`[B2B DISCOVER] Suppliers count after filtering: ${profiles.length}`);
-
-    // Sort
-    if (sortBy === 'nearest') {
-      profiles.sort((a, b) => {
-        if (a.distance_km === null && b.distance_km === null) return 0;
-        if (a.distance_km === null) return 1;
-        if (b.distance_km === null) return -1;
-        return a.distance_km - b.distance_km;
-      });
-    } else if (sortBy === 'lowest_price') {
-      profiles.sort((a, b) => a.minPrice - b.minPrice);
-    } else if (sortBy === 'recommended') {
-      const distances = profiles.map(p => p.distance_km).filter(d => d !== null);
-      const maxDist = distances.length > 0 ? Math.max(...distances, 1) : 1;
-      const counts = profiles.map(p => p.productCount);
-      const maxCount = counts.length > 0 ? Math.max(...counts, 1) : 1;
-
-      profiles.forEach(p => {
-        const distScore = p.distance_km !== null ? p.distance_km / maxDist : 0.5;
-        const countScore = maxCount > 0 ? 1 - p.productCount / maxCount : 0.5;
-        p._score = 0.6 * distScore + 0.4 * countScore;
-      });
-      profiles.sort((a, b) => a._score - b._score);
+    console.log(`[B2B DISCOVER] RAW users count (no join): ${rawUsers?.length || 0}`);
+    if (rawUsers && rawUsers.length > 0) {
+      rawUsers.forEach(u => console.log(`[B2B DISCOVER] RAW user: id=${u.id}, shop_name="${u.shop_name}", role="${u.role}"`));
     } else {
-      profiles.sort((a, b) => (a.shop_name || '').localeCompare(b.shop_name || ''));
+      console.log("[B2B DISCOVER] RAW USERS IS EMPTY — possible RLS or query issue!");
     }
 
-    const from = (parseInt(page) - 1) * parseInt(limit);
-    const total = profiles.length;
-    const paged = profiles.slice(from, from + parseInt(limit));
+    // ── STEP 2: Now try WITH the product join ────────────────────────────
+    const { data: users, error } = await supabase
+      .from('users')
+      .select(`
+        id, email, shop_name, role, latitude, longitude, address, city, state, is_profile_complete, created_at,
+        wholesaler_products:wholesaler_products(*)
+      `)
+      .in('role', ['wholesaler', 'distributor', 'producer']);
+
+    if (error) {
+      console.error("[B2B DISCOVER] JOIN query failed:", error);
+      return res.status(500).json({ message: 'DB join query failed', error });
+    }
+
+    console.log(`[B2B DISCOVER] JOIN query users count: ${users?.length || 0}`);
+
+    // ── STEP 3: Return debug response (bypassing all filters) ─────────────
+    // Build a simple unfiltered profile list from raw users for verification
+    const debugProfiles = (rawUsers || [])
+      .filter(u => u.id !== req.user.id)  // only exclude self
+      .map(u => ({
+        id: u.id,
+        shop_name: u.shop_name,
+        role: u.role,
+        latitude: u.latitude,
+        longitude: u.longitude,
+        address: u.address,
+        city: u.city,
+        state: u.state,
+        hasProducts: false,
+        productCount: 0,
+      }));
+
+    console.log(`[B2B DISCOVER] DEBUG — Returning ${debugProfiles.length} raw unfiltered profiles (excluding self)`);
 
     res.json({
-      profiles: paged,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / parseInt(limit))
+      profiles: debugProfiles,
+      pagination: { page: 1, limit: debugProfiles.length, total: debugProfiles.length, pages: 1 },
+      _debug: {
+        rawUsersCount: rawUsers?.length || 0,
+        joinedUsersCount: users?.length || 0,
+        supplierType,
+        reqUserId: req.user?.id,
+        hasJoinedProducts: users?.map(u => ({
+          id: u.id,
+          shop_name: u.shop_name,
+          role: u.role,
+          productCount: (u.wholesaler_products || []).length,
+        })) || [],
       },
     });
   } catch (error) {
