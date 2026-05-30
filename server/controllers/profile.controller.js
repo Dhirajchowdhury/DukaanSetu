@@ -547,7 +547,7 @@ const getSellerProfile = async (req, res, next) => {
     const userFetch = supabase.from('users')
       .select('id, email, shop_name, role, latitude, longitude, address, city, state, is_profile_complete, created_at')
       .eq('id', profileId)
-      .single();
+      .maybeSingle();
 
     const listingsFetch = supabase.from('wholesaler_products')
       .select('*')

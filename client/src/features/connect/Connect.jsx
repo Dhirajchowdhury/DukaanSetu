@@ -136,7 +136,6 @@ const SupplierCard = React.memo(({
   const cardLocation =
     (city && state && `${city}, ${state}`) ||
     city ||
-    (lat && lng && "📍 Location available") ||
     "🌍 Pan-India supplier";
 
   return (
@@ -763,34 +762,57 @@ const ConnectFeature = () => {
     if (!newMessage.trim() || !activeConv) return;
 
     const messageText = newMessage.trim();
+    if (!messageText) {
+      toast.error('Message content cannot be empty');
+      return;
+    }
+
+    const sender_id = user?.id;
+    const partner = getChatPartner(activeConv) || sellerProfile;
+    const receiver_id = partner?.id;
+
+    if (!sender_id) {
+      toast.error('Sender profile unavailable');
+      return;
+    }
+    if (!receiver_id) {
+      toast.error('Receiver profile unavailable');
+      return;
+    }
+
     setNewMessage(''); // optimistic UI clear
 
     try {
       let convId = activeConv?.id;
       if (!convId) {
-        const partner = getChatPartner(activeConv) || sellerProfile;
-        if (partner?.id) {
-          console.log(`[Messaging] Conversation ID missing. Creating conversation first with partner ID: ${partner.id}`);
-          const { data: convData } = await api.post('/conversations', { otherUserId: partner.id });
+        console.log(`[Messaging] Conversation ID missing. Creating conversation first for receiver_id: ${receiver_id}`);
+        try {
+          const { data: convData } = await api.post('/conversations', { otherUserId: receiver_id });
           convId = convData.conversation?.id;
+          if (!convId) {
+            throw new Error("Invalid conversation response");
+          }
           setActiveConv(convData.conversation);
           console.log(`[Messaging] Conversation created successfully: ${convId}`);
+        } catch (convErr) {
+          console.error(`[Messaging] Conversation creation failed, stopping message delivery:`, convErr);
+          toast.error('Could not establish conversation with this supplier');
+          setNewMessage(messageText); // restore text
+          return; // STOP EXECUTION!
         }
-      }
-
-      if (!convId) {
-        throw new Error("No active conversation found or could be created");
       }
 
       console.log(`[Messaging] Sending message to POST /api/messages. Payload:`, {
         conversation_id: convId,
-        sender_id: user?.id,
+        sender_id,
+        receiver_id,
         content: messageText
       });
 
       const { data } = await api.post('/messages', {
         conversation_id: convId,
-        sender_id: user?.id,
+        sender_id,
+        receiver_id,
         content: messageText
       });
 
@@ -799,7 +821,7 @@ const ConnectFeature = () => {
       const msgObj = data.message || {
         id: data.id || Math.random().toString(),
         text: messageText,
-        sender_id: user?.id,
+        sender_id,
         created_at: new Date().toISOString()
       };
       setMessages(prev => [...prev, msgObj]);
@@ -894,7 +916,11 @@ const ConnectFeature = () => {
           profile={profile}
           onConnect={handleConnectUser}
           onMessage={startChatWithSeller}
-          onViewProfile={(sellerId) => navigate(`/profile/${sellerId}`)}
+          onViewProfile={(sellerId) => {
+            if (!sellerId) return;
+            console.log(`[DEBUG] onViewProfile navigation - sellerId before navigation:`, sellerId);
+            navigate(`/profile/${sellerId}`);
+          }}
           isClosest={isClosest}
           isBestPrice={isBestPrice}
           isTrending={isTrending}
@@ -933,7 +959,6 @@ const ConnectFeature = () => {
     const sellerLoc =
       (city && state && `${city}, ${state}`) ||
       city ||
-      (lat && lng && "📍 Location available") ||
       "🌍 Pan-India supplier";
 
     const listings = sellerListings || [];

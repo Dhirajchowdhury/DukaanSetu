@@ -182,27 +182,40 @@ const sendMessage = async (req, res, next) => {
   console.log(`[API REQUEST ${reqId}] POST /api/messages body:`, req.body);
 
   try {
-    const conversation_id = req.body.conversation_id || req.body.conversationId;
-    const sender_id = req.body.sender_id || req.user?.id;
+    const conversation_id = req.body.conversation_id || req.body.conversationId || req.params.id;
+    const sender_id = req.body.sender_id || req.body.senderId || req.user?.id;
+    const receiver_id = req.body.receiver_id || req.body.receiverId || req.body.otherUserId;
     const content = req.body.content || req.body.text || req.body.message;
-    const otherUserId = req.body.otherUserId;
+
+    // Strict validation: reject request if any field is missing
+    if (!content || !content.trim()) {
+      console.log(`[API REQUEST ${reqId}] Error: content cannot be empty`);
+      return res.status(400).json({ message: 'content cannot be empty' });
+    }
+    if (!sender_id) {
+      console.log(`[API REQUEST ${reqId}] Error: sender_id is required`);
+      return res.status(400).json({ message: 'sender_id is required' });
+    }
+    if (!receiver_id) {
+      console.log(`[API REQUEST ${reqId}] Error: receiver_id is required`);
+      return res.status(400).json({ message: 'receiver_id is required' });
+    }
 
     let targetConvId = conversation_id;
-    const messageText = content;
 
-    if (!messageText?.trim()) {
-      console.log(`[API REQUEST ${reqId}] Error: Message cannot be empty`);
-      return res.status(400).json({ message: 'Message cannot be empty' });
-    }
-
-    if (!targetConvId && !otherUserId) {
-      console.log(`[API REQUEST ${reqId}] Error: conversation_id or otherUserId is required`);
-      return res.status(400).json({ message: 'conversation_id or otherUserId is required' });
-    }
-
-    let otherId = otherUserId;
-
-    if (targetConvId) {
+    if (!targetConvId) {
+      // Ensure conversation exists or create it
+      try {
+        console.log(`[API REQUEST ${reqId}] conversation_id missing. Fetching or creating conversation for sender: ${sender_id}, receiver: ${receiver_id}`);
+        targetConvId = await getOrCreateConversation(sender_id, receiver_id);
+        console.log(`[API REQUEST ${reqId}] Conversation successfully retrieved or created: ${targetConvId}`);
+      } catch (convErr) {
+        console.error(`[API REQUEST ${reqId}] Conversation creation failed:`, convErr);
+        // if creation fails → stop execution and return clear error
+        return res.status(500).json({ message: 'Failed to retrieve or establish a conversation between sender and receiver.' });
+      }
+    } else {
+      // Specified conversation validation
       const { data: conv, error: convErr } = await supabase
         .from('conversations')
         .select('id, user1_id, user2_id')
@@ -211,18 +224,30 @@ const sendMessage = async (req, res, next) => {
 
       console.log(`[API REQUEST ${reqId}] Supabase conversation response:`, { conv, convErr });
 
-      if (convErr) throw convErr;
+      if (convErr) {
+        console.error(`[API REQUEST ${reqId}] Supabase conversation lookup error:`, convErr);
+        return res.status(500).json({ message: 'Failed to verify specified conversation_id existence.' });
+      }
+
       if (!conv) {
-        return res.status(404).json({ message: 'Conversation not found' });
+        // Fallback: try to establish it
+        try {
+          console.log(`[API REQUEST ${reqId}] Specified conversation not found in database. Auto-establishing between sender: ${sender_id}, receiver: ${receiver_id}`);
+          targetConvId = await getOrCreateConversation(sender_id, receiver_id);
+        } catch (convErr) {
+          console.error(`[API REQUEST ${reqId}] Conversation fallback establishment failed:`, convErr);
+          return res.status(500).json({ message: 'Failed to find or establish specified conversation.' });
+        }
+      } else {
+        // Validate authorizations
+        if (conv.user1_id !== sender_id && conv.user2_id !== sender_id) {
+          return res.status(403).json({ message: 'Not authorized to send messages to this conversation.' });
+        }
       }
-      if (conv.user1_id !== sender_id && conv.user2_id !== sender_id) {
-        return res.status(403).json({ message: 'Not authorized' });
-      }
-      otherId = conv.user1_id === sender_id ? conv.user2_id : conv.user1_id;
     }
 
     // Verify connection exists between users
-    const [u1, u2] = [sender_id, otherId].sort();
+    const [u1, u2] = [sender_id, receiver_id].sort();
     const { data: conn, error: connErr } = await supabase
       .from('connections')
       .select('id')
@@ -237,18 +262,12 @@ const sendMessage = async (req, res, next) => {
       return res.status(403).json({ message: 'You can only message users you are connected with.' });
     }
 
-    if (!targetConvId) {
-      // Auto-create conversation if it doesn't exist
-      targetConvId = await getOrCreateConversation(sender_id, otherId);
-      console.log(`[API REQUEST ${reqId}] Auto-created conversation:`, targetConvId);
-    }
-
     const { data: msg, error: msgErr } = await supabase
       .from('messages')
       .insert({
         conversation_id: targetConvId,
         sender_id:       sender_id,
-        text:            messageText.trim(),
+        text:            content.trim(),
       })
       .select('id, text, sender_id, created_at')
       .single();
@@ -261,6 +280,7 @@ const sendMessage = async (req, res, next) => {
       message: msg,
       conversation_id: targetConvId,
       sender_id: sender_id,
+      receiver_id: receiver_id,
       content: msg.text
     });
   } catch (error) {

@@ -115,7 +115,6 @@ const Connections = () => {
                       <span className="line-clamp-1">
                         {(otherUser.city && otherUser.state && `${otherUser.city}, ${otherUser.state}`) ||
                           otherUser.city ||
-                          (otherUser.latitude && otherUser.longitude && "📍 Location available") ||
                           "🌍 Pan-India supplier"}
                       </span>
                     </div>

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_URL } from '../config/api';
+import toast from 'react-hot-toast';
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,
@@ -62,6 +63,12 @@ api.interceptors.response.use(
       message: error.response?.data?.message || error.message,
       data: error.response?.data
     });
+
+    const errMessage = error.response?.data?.message || error.message || 'An unexpected error occurred';
+    if (error.response?.status !== 401) {
+      toast.error(errMessage);
+    }
+
     const originalRequest = error.config;
 
     // If token expired, try to refresh
