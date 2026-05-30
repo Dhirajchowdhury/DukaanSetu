@@ -23,7 +23,7 @@ const ProductModal = ({ product, onClose }) => {
       setForm({
         productName: product.productName || '',
         brand: product.brand || '',
-        categoryId: product.categoryId?._id || product.categoryId || '',
+        categoryId: product.categoryId?.id || product.categoryId?._id || product.categoryId || '',
         quantity: product.quantity ?? '',
         unit: product.unit || 'pieces',
         sellingPrice: product.sellingPrice || '',
@@ -66,7 +66,7 @@ const ProductModal = ({ product, onClose }) => {
         costPrice: form.costPrice ? Number(form.costPrice) : undefined,
         expiryDate: form.expiryDate || undefined,
       };
-      if (isEdit) await updateProduct(product._id, payload);
+      if (isEdit) await updateProduct(product.id || product._id, payload);
       else await createProduct(payload);
       onClose();
     } catch {
@@ -122,8 +122,8 @@ const ProductModal = ({ product, onClose }) => {
                   onChange={handleChange}
                 >
                   <option value="">Select category</option>
-                  {categories.map(c => (
-                    <option key={c._id} value={c._id}>{c.icon} {c.name}</option>
+                  {(categories || []).map(c => (
+                    <option key={c.id || c._id} value={c.id || c._id}>{c.icon} {c.name}</option>
                   ))}
                 </select>
                 {errors.categoryId && <p className="form-error">{errors.categoryId}</p>}

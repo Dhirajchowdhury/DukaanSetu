@@ -75,8 +75,8 @@ const Reports = () => {
               <p className="text-muted" style={{ fontSize: 14 }}>All items are well stocked 🎉</p>
             ) : (
               <div className="report-list">
-                {lowStockItems.slice(0, 10).map(p => (
-                  <div key={p._id} className="report-list__row">
+                {(lowStockItems || []).slice(0, 10).map(p => (
+                  <div key={p.id || p._id} className="report-list__row">
                     <span className="report-list__name">{p.productName}</span>
                     <span className="badge badge-warning">{p.quantity} {p.unit}</span>
                   </div>
@@ -92,8 +92,8 @@ const Reports = () => {
               <p className="text-muted" style={{ fontSize: 14 }}>No items are out of stock 🎉</p>
             ) : (
               <div className="report-list">
-                {outOfStock.slice(0, 10).map(p => (
-                  <div key={p._id} className="report-list__row">
+                {(outOfStock || []).slice(0, 10).map(p => (
+                  <div key={p.id || p._id} className="report-list__row">
                     <span className="report-list__name">{p.productName}</span>
                     <span className="badge badge-danger">Out of Stock</span>
                   </div>
@@ -109,8 +109,8 @@ const Reports = () => {
               <p className="text-muted" style={{ fontSize: 14 }}>No items expiring within 7 days 🎉</p>
             ) : (
               <div className="report-list">
-                {expiringSoon.slice(0, 10).map(p => (
-                  <div key={p._id} className="report-list__row">
+                {(expiringSoon || []).slice(0, 10).map(p => (
+                  <div key={p.id || p._id} className="report-list__row">
                     <span className="report-list__name">{p.productName}</span>
                     <span className="badge badge-danger">
                       {p.expiryDate ? new Date(p.expiryDate).toLocaleDateString('en-IN') : ''}

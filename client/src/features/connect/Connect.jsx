@@ -460,8 +460,8 @@ const ConnectFeature = () => {
 
   // Helper: Find chat partner details
   const getChatPartner = (conv) => {
-    if (!conv) return null;
-    return conv.user1.id === user.id ? conv.user2 : conv.user1;
+    if (!conv || !conv.user1 || !conv.user2) return null;
+    return conv.user1.id === user?.id ? conv.user2 : conv.user1;
   };
 
   // ── Inquiry System Operations ──
@@ -1459,29 +1459,41 @@ const ConnectFeature = () => {
                     <button className="chat-header__back" onClick={() => setActiveConv(null)}>
                       <FiArrowLeft />
                     </button>
-                    <div className="chat-item__avatar" style={{ width: 36, height: 36, fontSize: 14 }}>
-                      {getChatPartner(activeConv)?.shop_name?.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <h4 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>
-                        {getChatPartner(activeConv)?.shop_name}
-                      </h4>
-                      <span className="badge badge-success" style={{ fontSize: 9, padding: '1px 6px' }}>
-                        {formatRoleLabel(getChatPartner(activeConv)?.role)}
-                      </span>
-                    </div>
+                    {(() => {
+                      const partner = getChatPartner(activeConv);
+                      if (!partner) return null;
+                      return (
+                        <>
+                          <div className="chat-item__avatar" style={{ width: 36, height: 36, fontSize: 14 }}>
+                            {partner.shop_name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h4 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>
+                              {partner.shop_name}
+                            </h4>
+                            <span className="badge badge-success" style={{ fontSize: 9, padding: '1px 6px' }}>
+                              {formatRoleLabel(partner.role)}
+                            </span>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                   
                   {/* Google Maps link directly in Chat header if they have a location! */}
-                  {getChatPartner(activeConv)?.id && (
-                    <button 
-                      onClick={() => viewSellerProfile(getChatPartner(activeConv).id)}
-                      className="btn btn-secondary btn-sm"
-                      style={{ padding: '6px 12px', fontSize: 12 }}
-                    >
-                      <FiUser /> View Profile
-                    </button>
-                  )}
+                  {(() => {
+                    const partner = getChatPartner(activeConv);
+                    if (!partner || !partner.id) return null;
+                    return (
+                      <button 
+                        onClick={() => viewSellerProfile(partner.id)}
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '6px 12px', fontSize: 12 }}
+                      >
+                        <FiUser /> View Profile
+                      </button>
+                    );
+                  })()}
                 </div>
 
                 {/* Messages Body */}

@@ -5,10 +5,19 @@ import { FiPackage, FiTruck, FiCheckCircle, FiXCircle, FiClock, FiExternalLink }
 import toast from 'react-hot-toast';
 
 const Orders = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all, buyer, seller
+
+  if (authLoading || !user) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh', flexDirection: 'column', gap: 12 }}>
+        <div className="spinner spinner-lg" />
+        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading user profile…</p>
+      </div>
+    );
+  }
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -107,7 +116,7 @@ const Orders = () => {
       ) : (
         <div className="space-y-4">
           {orders.map((order) => {
-            const isSeller = order.seller_id === user.id;
+            const isSeller = order.seller_id === user?.id;
             return (
               <div key={order.id} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row gap-6">
                 <div className="flex-1">

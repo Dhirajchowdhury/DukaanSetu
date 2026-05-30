@@ -121,8 +121,8 @@ const ProductTable = ({ compact = false }) => {
               onChange={e => setCategoryFilter(e.target.value)}
             >
               <option value="">All Categories</option>
-              {categories.map(c => (
-                <option key={c._id} value={c._id}>{c.icon} {c.name}</option>
+              {(categories || []).map(c => (
+                <option key={c.id || c._id} value={c.id || c._id}>{c.icon} {c.name}</option>
               ))}
             </select>
             <select
@@ -180,8 +180,8 @@ const ProductTable = ({ compact = false }) => {
                 </tr>
               </thead>
               <tbody>
-                {products.map(product => (
-                  <tr key={product._id}>
+                {(products || []).map(product => (
+                  <tr key={product.id || product._id}>
                     <td>
                       <div className="pt-product-cell">
                         <div className="pt-product-name">{product.productName}</div>
@@ -191,7 +191,7 @@ const ProductTable = ({ compact = false }) => {
                     <td>
                       {product.categoryId ? (
                         <span className="badge badge-neutral">
-                          {product.categoryId.icon} {product.categoryId.name}
+                          {product.categoryId?.icon} {product.categoryId?.name}
                         </span>
                       ) : '—'}
                     </td>
@@ -225,7 +225,7 @@ const ProductTable = ({ compact = false }) => {
                         <button
                           className="btn-icon pt-btn-delete"
                           title="Delete"
-                          onClick={() => handleDelete(product._id)}
+                          onClick={() => handleDelete(product.id || product._id)}
                         >
                           <FiTrash2 />
                         </button>

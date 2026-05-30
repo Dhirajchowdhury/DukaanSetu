@@ -93,8 +93,9 @@ const Connections = () => {
           </div>
         ) : (
           <div className="connections-grid animate-fade-in">
-            {connections.map((conn) => {
+            {(connections || []).map((conn) => {
               const { otherUser } = conn;
+              if (!otherUser) return null; // Enforce safe rendering guard
               const hasCoords = otherUser.latitude != null && otherUser.longitude != null;
               
               return (

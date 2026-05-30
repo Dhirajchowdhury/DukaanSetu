@@ -18,10 +18,50 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle token refresh
+// Response interceptor to handle token refresh, log responses, and validate contracts
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // API Contract Logger
+    console.log(`[API RESPONSE] [SUCCESS] ${response.config.method?.toUpperCase()} ${response.config.url}`, {
+      status: response.status,
+      data: response.data
+    });
+
+    // Contract validation and defensive fallbacks
+    const url = response.config.url || '';
+    const method = (response.config.method || '').toLowerCase();
+
+    if (url.includes('/products') && method === 'get') {
+      const data = response.data || {};
+      if (!data.products || !Array.isArray(data.products)) {
+        console.warn(`[API CONTRACT WARNING] GET /products expected products array, got:`, data.products);
+        if (!response.data) response.data = {};
+        response.data.products = [];
+      }
+      if (!data.pagination || typeof data.pagination !== 'object') {
+        console.warn(`[API CONTRACT WARNING] GET /products expected pagination object, got:`, data.pagination);
+        if (!response.data) response.data = {};
+        response.data.pagination = { page: 1, limit: 20, total: 0, pages: 1 };
+      }
+    }
+
+    if (url.includes('/categories') && method === 'get') {
+      const data = response.data || {};
+      if (!data.categories || !Array.isArray(data.categories)) {
+        console.warn(`[API CONTRACT WARNING] GET /categories expected categories array, got:`, data.categories);
+        if (!response.data) response.data = {};
+        response.data.categories = [];
+      }
+    }
+
+    return response;
+  },
   async (error) => {
+    console.error(`[API RESPONSE] [ERROR] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
+      status: error.response?.status,
+      message: error.response?.data?.message || error.message,
+      data: error.response?.data
+    });
     const originalRequest = error.config;
 
     // If token expired, try to refresh
