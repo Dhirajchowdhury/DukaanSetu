@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 const api = axios.create({
   baseURL: `${API_URL}/api`,
   withCredentials: true,
+  timeout: 10000,
 });
 
 // Request interceptor to add token
@@ -71,24 +72,32 @@ api.interceptors.response.use(
 
     const originalRequest = error.config;
 
-    // If token expired, try to refresh
-    if (error.response?.status === 401 && error.response?.data?.expired && !originalRequest._retry) {
-      originalRequest._retry = true;
+    if (error.response?.status === 401) {
+      // Token expired — try refresh once
+      if (error.response?.data?.expired && !originalRequest._retry) {
+        originalRequest._retry = true;
 
-      try {
-        const { data } = await axios.post(`${API_URL}/api/auth/refresh`, {}, {
-          withCredentials: true,
-        });
+        try {
+          const { data } = await axios.post(`${API_URL}/api/auth/refresh`, {}, {
+            withCredentials: true,
+            timeout: 10000,
+          });
 
-        localStorage.setItem('accessToken', data.accessToken);
-        originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+          localStorage.setItem('accessToken', data.accessToken);
+          originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
 
-        return api(originalRequest);
-      } catch (refreshError) {
-        localStorage.removeItem('accessToken');
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
+          return api(originalRequest);
+        } catch (refreshError) {
+          localStorage.removeItem('accessToken');
+          window.location.href = '/login';
+          return Promise.reject(refreshError);
+        }
       }
+
+      // Invalid / missing token — redirect immediately
+      localStorage.removeItem('accessToken');
+      window.location.href = '/login';
+      return Promise.reject(error);
     }
 
     return Promise.reject(error);

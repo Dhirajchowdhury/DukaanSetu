@@ -162,10 +162,19 @@ const getMessages = async (req, res, next) => {
       .from('messages')
       .select('id, text, sender_id, created_at')
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true })
+      .limit(50);
 
     if (error) throw error;
-    res.json({ messages: messages || [] });
+
+    // Standardise: DB stores "text", API returns "content"
+    const normalized = (messages || []).map(msg => ({
+      id: msg.id,
+      content: msg.text,
+      sender_id: msg.sender_id,
+      created_at: msg.created_at,
+    }));
+    res.json({ messages: normalized });
   } catch (error) {
     next(error);
   }
@@ -275,13 +284,20 @@ const sendMessage = async (req, res, next) => {
     console.log(`[API REQUEST ${reqId}] Supabase message insert response:`, { msg, msgErr });
 
     if (msgErr) throw msgErr;
+
+    const normalizedMsg = {
+      id: msg.id,
+      content: msg.text,
+      sender_id: msg.sender_id,
+      created_at: msg.created_at,
+    };
     
     res.status(201).json({ 
-      message: msg,
+      message: normalizedMsg,
       conversation_id: targetConvId,
       sender_id: sender_id,
       receiver_id: receiver_id,
-      content: msg.text
+      content: normalizedMsg.content,
     });
   } catch (error) {
     console.error(`[API REQUEST ${reqId}] Error sending message:`, error);

@@ -312,8 +312,9 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_messages_conv_id ON messages (conversation_id);
-CREATE INDEX IF NOT EXISTS idx_messages_created ON messages (created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_messages_conv_id    ON messages (conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created    ON messages (created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_messages_conv_created ON messages (conversation_id, created_at ASC);
 
 -- ── INQUIRIES ─────────────────────────────────────────────────────────────────
 

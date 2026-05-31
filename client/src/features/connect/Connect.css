@@ -514,6 +514,18 @@
   justify-content: center;
   font-weight: 700;
   font-size: 16px;
+  position: relative;
+}
+
+.chat-item__online-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid var(--bg-primary, #fff);
 }
 
 .chat-item__content {

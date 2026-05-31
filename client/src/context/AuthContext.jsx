@@ -82,7 +82,6 @@ export const AuthProvider = ({ children }) => {
       toast.success(`Welcome back, ${data.user.shopName}!`);
       return data;
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Login failed');
       throw error;
     }
   };

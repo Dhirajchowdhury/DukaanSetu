@@ -1,4 +1,5 @@
 require('dotenv').config();
+const http         = require('http');
 const express      = require('express');
 const cors         = require('cors');
 const helmet       = require('helmet');
@@ -9,6 +10,7 @@ const { connectDB }      = require('./config/db');
 const passport           = require('./config/passport');
 const errorHandler       = require('./middleware/errorHandler');
 const alertScheduler     = require('./cron/alertScheduler');
+const { setupSocket }    = require('./services/socket');
 
 const authRoutes         = require('./routes/auth.routes');
 const productRoutes      = require('./routes/product.routes');
@@ -40,12 +42,20 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
-  max:      100,
-  message:  'Too many requests from this IP, please try again later.',
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max:      20,
+  message:  'Too many auth attempts, please try again later.',
 });
-app.use('/api/', limiter);
+app.use('/api/auth', authLimiter);
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max:      600,
+  message:  'Too many requests from this IP, please try again later.',
+  skip:     (req) => req.originalUrl.startsWith('/api/auth/'),
+});
+app.use('/api/', apiLimiter);
 
 // ── Passport (Google OAuth) ───────────────────────────────────────────────────
 app.use(passport.initialize());
@@ -87,11 +97,15 @@ app.use(errorHandler);
 // ── Cron jobs ─────────────────────────────────────────────────────────────────
 alertScheduler.start();
 
+const server = http.createServer(app);
+setupSocket(server);
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV}`);
   console.log(`🗄️  Database: Supabase (PostgreSQL)`);
+  console.log(`🔌 WebSocket (Socket.IO) enabled`);
 }).on("error", (err) => {
   if (err.code === "EADDRINUSE") {
     console.error(`Port ${PORT} is already in use`);

@@ -27,6 +27,7 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
     if (!form.email || !form.password) {
       setFieldError('Please fill in all fields.');
       return;

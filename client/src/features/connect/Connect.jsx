@@ -2,6 +2,10 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import {
+  connectSocket, disconnectSocket, joinConversation,
+  sendMessage as socketSend, onMessage, offMessage, isConnected,
+} from '../../services/socket';
 import { 
   FiSearch, FiMapPin, FiPackage, FiShoppingCart, FiMessageSquare, 
   FiCompass, FiNavigation, FiMap, FiUser, FiSend, FiX, 
@@ -323,6 +327,7 @@ const ConnectFeature = () => {
   const [newMessage, setNewMessage] = useState('');
   const [chatsLoading, setChatsLoading] = useState(false);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [sendingMessage, setSendingMessage] = useState(false);
   const chatEndRef = useRef(null);
 
   // Connect Loading state
@@ -349,22 +354,24 @@ const ConnectFeature = () => {
   }, [messages]);
 
   // Sync routing and state (for redirection from connections/orders pages)
+  const activeTabOverride = location.state?.activeTab;
+  const activeConvOverride = location.state?.activeConv;
   useEffect(() => {
-    if (location.state?.activeTab) {
-      setActiveTab(location.state.activeTab);
-      if (location.state.activeConv) {
-        setActiveConv(location.state.activeConv);
-        fetchMessages(location.state.activeConv.id, true);
+    if (activeTabOverride) {
+      setActiveTab(activeTabOverride);
+      if (activeConvOverride) {
+        setActiveConv(activeConvOverride);
+        fetchMessages(activeConvOverride.id, true);
       }
       // Clean up state on navigation history so it doesn't loop
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location]);
+  }, [activeTabOverride, activeConvOverride?.id]);
 
   // 1. Initialise and load tab data
   useEffect(() => {
     if (activeTab === 'discovery') {
-      if (!selectedSellerId) {
+      if (!selectedSellerId && !routeSellerId) {
         fetchDiscoverProfiles();
       }
     } else if (activeTab === 'chat') {
@@ -372,22 +379,57 @@ const ConnectFeature = () => {
     } else if (activeTab === 'connections') {
       fetchConnections();
     }
-  }, [activeTab, dSearch, dLocation, dRole, dMinPrice, dMaxPrice, dSortBy, dPage, dMaxDistance, selectedSellerId]);
+  }, [activeTab, dSearch, dLocation, dRole, dMinPrice, dMaxPrice, dSortBy, dPage, dMaxDistance, selectedSellerId, routeSellerId]);
 
-  // Chat Polling Interval
+  // Online user tracking
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
+  const activeConvRef = useRef(activeConv?.id);
+  activeConvRef.current = activeConv?.id;
+
+  // Socket lifecycle — connect when user is available
   useEffect(() => {
-    if (activeTab !== 'chat' || !activeConv) return;
-    
-    // Fetch immediately
-    fetchMessages(activeConv.id, false);
-    
-    // Poll every 3 seconds
-    const interval = setInterval(() => {
-      fetchMessages(activeConv.id, false);
-    }, 3000);
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+    const sock = connectSocket(token);
 
-    return () => clearInterval(interval);
-  }, [activeTab, activeConv]);
+    sock.on('user_online', ({ userId }) => {
+      setOnlineUsers(prev => new Set(prev).add(userId));
+    });
+    sock.on('user_offline', ({ userId }) => {
+      setOnlineUsers(prev => { const s = new Set(prev); s.delete(userId); return s; });
+    });
+
+    // Re-join current conversation on reconnect
+    sock.on('connect', () => {
+      if (activeConvRef.current) {
+        joinConversation(activeConvRef.current);
+      }
+    });
+
+    return () => disconnectSocket();
+  }, []);
+
+  // Join conversation room when active conversation changes
+  useEffect(() => {
+    if (activeTab === 'chat' && activeConv?.id) {
+      joinConversation(activeConv.id);
+      // Initial fetch via HTTP (failsafe / load history)
+      fetchMessages(activeConv.id, false);
+    }
+  }, [activeTab, activeConv?.id]);
+
+  // Listen for incoming real-time messages
+  useEffect(() => {
+    onMessage((msg) => {
+      // Guard: only accept messages for the currently active conversation
+      if (msg.conversation_id && msg.conversation_id !== activeConvRef.current) return;
+      setMessages(prev => {
+        if (prev.some(m => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+    });
+    return () => offMessage();
+  }, []);
 
   // Connections Fetching & Updating Handlers
   const fetchConnections = async () => {
@@ -669,8 +711,21 @@ const ConnectFeature = () => {
   };
 
   // ── Single Seller Profile details ──
+  const profileAbort = useRef(null);
+  const currentProfileId = useRef(null);
   const viewSellerProfile = async (userId) => {
+    if (currentProfileId.current === userId) return;
+    currentProfileId.current = userId;
+
     const isDev = process.env.NODE_ENV !== 'production';
+
+    // Abort any in-flight fetch for a previous user
+    if (profileAbort.current) {
+      profileAbort.current.abort();
+    }
+    const controller = new AbortController();
+    profileAbort.current = controller;
+
     setProfileLoading(true);
     setSelectedSellerId(userId);
 
@@ -683,11 +738,12 @@ const ConnectFeature = () => {
       setSellerListings(profileCache[userId].listings || []);
       setProfileLoading(false);
 
-      // Still fetch fresh products (not cached)
       try {
-        const prodRes = await api.get(`/profile/products/${userId}`);
+        const prodRes = await api.get(`/profile/products/${userId}`, { signal: controller.signal });
+        if (controller.signal.aborted) return;
         setSellerProducts(prodRes.data?.products || []);
       } catch {
+        if (controller.signal.aborted) return;
         setSellerProducts([]);
       }
       return;
@@ -698,9 +754,16 @@ const ConnectFeature = () => {
     }
 
     try {
-      const { data } = await api.get(`/profile/${userId}`);
-      if (isDev) {
-        console.log("[viewSellerProfile] API response received:", data);
+      const { data } = await api.get(`/profile/${userId}`, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+
+      // 404 from backend
+      if (!data.seller) {
+        toast.error('Seller not found');
+        setProfileLoading(false);
+        setSelectedSellerId(null);
+        navigate('/connect');
+        return;
       }
 
       // Store in memory cache
@@ -712,24 +775,35 @@ const ConnectFeature = () => {
       setSellerProfile(data.seller);
       setSellerListings(data.listings || []);
 
-      // Fetch seller's own inventory products
       try {
-        const prodRes = await api.get(`/profile/products/${userId}`);
+        const prodRes = await api.get(`/profile/products/${userId}`, { signal: controller.signal });
+        if (controller.signal.aborted) return;
         console.log("[SELLER PRODUCTS] Response:", prodRes.data);
         setSellerProducts(prodRes.data?.products || []);
       } catch (prodErr) {
+        if (controller.signal.aborted) return;
         console.error("[SELLER PRODUCTS] Error:", prodErr);
         setSellerProducts([]);
       }
     } catch (error) {
+      if (controller.signal.aborted) return;
       if (isDev) {
         console.error("[viewSellerProfile] API error loading seller details:", error);
       }
-      toast.error('Failed to load seller details');
+      if (error.response?.status === 404) {
+        toast.error('Seller not found');
+      } else {
+        toast.error('Failed to load seller details');
+      }
       setSelectedSellerId(null);
       navigate('/connect');
     } finally {
-      setProfileLoading(false);
+      if (!controller.signal.aborted) {
+        setProfileLoading(false);
+      }
+      if (profileAbort.current === controller) {
+        profileAbort.current = null;
+      }
     }
   };
 
@@ -737,13 +811,19 @@ const ConnectFeature = () => {
   useEffect(() => {
     if (routeSellerId) {
       viewSellerProfile(routeSellerId);
-      fetchSellerProducts(routeSellerId);
     } else {
       setSelectedSellerId(null);
       setSellerProfile(null);
       setSellerListings([]);
       setSellerProducts([]);
     }
+    return () => {
+      currentProfileId.current = null;
+      if (profileAbort.current) {
+        profileAbort.current.abort();
+        profileAbort.current = null;
+      }
+    };
   }, [routeSellerId]);
 
   // ── Chat & Inquiry CTAs ──
@@ -793,6 +873,7 @@ const ConnectFeature = () => {
       setMessages(data.messages || []);
     } catch (error) {
       console.error('[Messaging] Error fetching messages:', error);
+      toast.error('Failed to load messages');
     } finally {
       if (showSpinner) setMessagesLoading(false);
     }
@@ -800,6 +881,7 @@ const ConnectFeature = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
+    if (sendingMessage) return;
     if (!newMessage.trim() || !activeConv) return;
 
     const messageText = newMessage.trim();
@@ -821,6 +903,7 @@ const ConnectFeature = () => {
       return;
     }
 
+    setSendingMessage(true);
     setNewMessage(''); // optimistic UI clear
 
     try {
@@ -839,37 +922,40 @@ const ConnectFeature = () => {
           console.error(`[Messaging] Conversation creation failed, stopping message delivery:`, convErr);
           toast.error('Could not establish conversation with this supplier');
           setNewMessage(messageText); // restore text
+          setSendingMessage(false);
           return; // STOP EXECUTION!
         }
       }
 
-      console.log(`[Messaging] Sending message to POST /api/messages. Payload:`, {
-        conversation_id: convId,
-        sender_id,
-        receiver_id,
-        content: messageText
-      });
-
-      const { data } = await api.post('/messages', {
-        conversation_id: convId,
-        sender_id,
-        receiver_id,
-        content: messageText
-      });
-
-      console.log(`[Messaging] Message sent successfully. Response:`, data);
-
-      const msgObj = data.message || {
-        id: data.id || Math.random().toString(),
-        text: messageText,
-        sender_id,
-        created_at: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, msgObj]);
+      // Try Socket.IO first, fallback to HTTP
+      try {
+        await socketSend({
+          conversationId: convId,
+          content: messageText,
+          senderId: sender_id,
+        });
+      } catch (socketErr) {
+        console.warn('[Messaging] Socket send failed, falling back to HTTP:', socketErr.message);
+        const { data } = await api.post('/messages', {
+          conversation_id: convId,
+          sender_id,
+          receiver_id,
+          content: messageText,
+        });
+        const msgObj = data.message || {
+          id: data.id || Math.random().toString(),
+          content: messageText,
+          sender_id,
+          created_at: new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, msgObj]);
+      }
     } catch (error) {
       console.error('[Messaging] Failed to send message:', error);
       toast.error('Failed to send message');
       setNewMessage(messageText); // restore text
+    } finally {
+      setSendingMessage(false);
     }
   };
 
@@ -1695,7 +1781,10 @@ const ConnectFeature = () => {
                       }}
                     >
                       <div className="chat-item__avatar">
-                        {partner.shop_name?.charAt(0).toUpperCase()}
+                        <span className="chat-item__avatar-letter">
+                          {partner.shop_name?.charAt(0).toUpperCase()}
+                        </span>
+                        {onlineUsers.has(partner.id) && <span className="chat-item__online-dot" />}
                       </div>
                       <div className="chat-item__content">
                         <div className="chat-item__header">
@@ -1776,7 +1865,7 @@ const ConnectFeature = () => {
                           key={msg.id} 
                           className={`msg-bubble ${isSender ? 'msg-bubble--sender' : 'msg-bubble--receiver'}`}
                         >
-                    <p style={{ margin: 0 }}>{msg.content || msg.message || msg.text}</p>
+                    <p style={{ margin: 0 }}>{msg.content}</p>
                       <span className="msg-bubble__time">
                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>

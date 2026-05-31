@@ -320,6 +320,11 @@ const getSellerProfile = async (req, res, next) => {
       return res.status(400).json({ message: 'Profile ID is required' });
     }
 
+    if (typeof profileId !== 'string' || profileId.length < 10) {
+      console.log(`[API REQUEST ${reqId}] Error: Invalid Profile ID format`);
+      return res.status(400).json({ message: 'Invalid profile ID' });
+    }
+
     const userFetch = supabase.from('users')
       .select('id, email, shop_name, role, latitude, longitude, address, city, state, is_profile_complete, created_at')
       .eq('id', profileId)

@@ -1,4 +1,4 @@
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { supabase } = require('../config/db');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../utils/generateToken');
 const { sendVerificationEmail } = require('../services/email.service');
