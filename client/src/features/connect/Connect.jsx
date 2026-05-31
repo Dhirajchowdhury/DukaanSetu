@@ -312,6 +312,7 @@ const ConnectFeature = () => {
   const [selectedSellerId, setSelectedSellerId] = useState(null);
   const [sellerProfile, setSellerProfile] = useState(null);
   const [sellerListings, setSellerListings] = useState([]);
+  const [sellerProducts, setSellerProducts] = useState([]);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileCache, setProfileCache] = useState({});
 
@@ -362,9 +363,7 @@ const ConnectFeature = () => {
 
   // 1. Initialise and load tab data
   useEffect(() => {
-    if (activeTab === 'marketplace') {
-      fetchMarketplaceProducts();
-    } else if (activeTab === 'discovery') {
+    if (activeTab === 'discovery') {
       if (!selectedSellerId) {
         fetchDiscoverProfiles();
       }
@@ -683,6 +682,14 @@ const ConnectFeature = () => {
       setSellerProfile(profileCache[userId].seller);
       setSellerListings(profileCache[userId].listings || []);
       setProfileLoading(false);
+
+      // Still fetch fresh products (not cached)
+      try {
+        const prodRes = await api.get(`/profile/products/${userId}`);
+        setSellerProducts(prodRes.data?.products || []);
+      } catch {
+        setSellerProducts([]);
+      }
       return;
     }
 
@@ -704,6 +711,16 @@ const ConnectFeature = () => {
 
       setSellerProfile(data.seller);
       setSellerListings(data.listings || []);
+
+      // Fetch seller's own inventory products
+      try {
+        const prodRes = await api.get(`/profile/products/${userId}`);
+        console.log("[SELLER PRODUCTS] Response:", prodRes.data);
+        setSellerProducts(prodRes.data?.products || []);
+      } catch (prodErr) {
+        console.error("[SELLER PRODUCTS] Error:", prodErr);
+        setSellerProducts([]);
+      }
     } catch (error) {
       if (isDev) {
         console.error("[viewSellerProfile] API error loading seller details:", error);
@@ -720,10 +737,12 @@ const ConnectFeature = () => {
   useEffect(() => {
     if (routeSellerId) {
       viewSellerProfile(routeSellerId);
+      fetchSellerProducts(routeSellerId);
     } else {
       setSelectedSellerId(null);
       setSellerProfile(null);
       setSellerListings([]);
+      setSellerProducts([]);
     }
   }, [routeSellerId]);
 
@@ -767,6 +786,10 @@ const ConnectFeature = () => {
       console.log(`[Messaging] Fetching messages for conversation: ${convId}`);
       const { data } = await api.get(`/messages/${convId}`);
       console.log(`[Messaging] Messages fetched successfully:`, data.messages ? data.messages.length : 0);
+      if (data.messages?.length > 0) {
+        console.log("[Messaging] First message keys:", Object.keys(data.messages[0]));
+        console.log("[Messaging] First message full:", data.messages[0]);
+      }
       setMessages(data.messages || []);
     } catch (error) {
       console.error('[Messaging] Error fetching messages:', error);
@@ -1132,9 +1155,43 @@ const ConnectFeature = () => {
             })}
           </div>
         )}
+
+        {/* Seller's own inventory products */}
+        <h3 className="profile-details__subtitle" style={{ marginTop: 32 }}>
+          <FiPackage className="text-primary" /> Inventory Products ({(sellerProducts || []).length})
+        </h3>
+        {(sellerProducts || []).length === 0 ? (
+          <div className="card empty-state">
+            <p>This seller hasn't added any inventory products yet.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {sellerProducts.map((product) => (
+              <div key={product.id} className="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex flex-col justify-between" style={{ minHeight: "200px", borderRadius: "16px" }}>
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900" style={{ margin: 0 }}>{product.product_name}</h4>
+                  {product.brand && <p className="text-xs text-gray-400" style={{ margin: '4px 0 0' }}>{product.brand}</p>}
+                  <div className="mt-3 flex justify-between items-end">
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase font-semibold" style={{ margin: 0 }}>Price</p>
+                      <span className="text-lg font-black text-indigo-600">₹{product.selling_price || product.cost_price || 0}</span>
+                      <span className="text-xs text-gray-400 ml-1">/ {product.unit || 'unit'}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-semibold">Qty: {product.quantity || 0}</span>
+                    </div>
+                  </div>
+                </div>
+                {product.expiry_date && (
+                  <p className="text-xs text-gray-400 mt-2" style={{ margin: 0 }}>Exp: {new Date(product.expiry_date).toLocaleDateString()}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
-  }, [sellerProfile, sellerListings, connectingUsers, routeSellerId]);
+  }, [sellerProfile, sellerListings, sellerProducts, connectingUsers, routeSellerId]);
 
   return (
     <div className="connect-container">
@@ -1254,12 +1311,6 @@ const ConnectFeature = () => {
           onClick={() => { setActiveTab('discovery'); setSelectedSellerId(null); }}
         >
           <FiCompass /> Discover Sellers
-        </button>
-        <button 
-          className={`connect-tab-btn ${activeTab === 'marketplace' ? 'connect-tab-btn--active' : ''}`}
-          onClick={() => { setActiveTab('marketplace'); setSelectedSellerId(null); }}
-        >
-          <FiPackage /> Product Catalog
         </button>
         <button 
           className={`connect-tab-btn ${activeTab === 'connections' ? 'connect-tab-btn--active' : ''}`}
@@ -1445,99 +1496,7 @@ const ConnectFeature = () => {
         </div>
       )}
 
-      {/* 3. PRODUCT CATALOG TAB (EXISTING INTERFACE) */}
-      {activeTab === 'marketplace' && (
-        <div>
-          {/* Search bar */}
-          <div className="relative mb-8 max-w-2xl" style={{ display: 'flex', gap: 12 }}>
-            <div style={{ position: 'relative', flex: 1 }}>
-              <FiSearch style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                type="text"
-                placeholder="Search for marketplace products or categories..."
-                className="form-input"
-                style={{ paddingLeft: 44 }}
-                value={mSearch}
-                onChange={(e) => setMSearch(e.target.value)}
-              />
-            </div>
-            <button onClick={fetchMarketplaceProducts} className="btn btn-primary">Search</button>
-          </div>
-
-          {mLoading ? (
-            <div className="loading-center">
-              <div className="spinner spinner-lg" />
-              <p>Loading products catalog…</p>
-            </div>
-          ) : marketplaceProducts.length === 0 ? (
-            <div className="empty-state card">
-              <div className="empty-state-icon">📦</div>
-              <h3>No products found</h3>
-              <p>Try searching for different items or categories.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {marketplaceProducts.map((product) => (
-                <div key={product.id} className="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between" style={{ minHeight: "240px", borderRadius: "16px" }}>
-                  {/* Top: Name, Category, Location */}
-                  <div className="mb-3">
-                    <div className="flex justify-between items-start gap-2 mb-1.5">
-                      <h3 className="text-sm font-bold text-gray-900 line-clamp-2" style={{ margin: 0 }}>{product.product_name}</h3>
-                      <span className="bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full text-[10px] font-bold border border-teal-100 flex-shrink-0">
-                        {product.category}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-400 flex items-center gap-1" style={{ margin: 0 }}>
-                      <FiMapPin className="text-teal-500" /> {product.location || 'Pan India'}
-                    </p>
-                  </div>
-
-                  {/* Middle: Price, Unit, MOQ */}
-                  <div className="mb-4 pt-3 border-t border-gray-50 flex justify-between items-end">
-                    <div>
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold" style={{ margin: 0 }}>Price</p>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-lg font-black text-indigo-600">₹{product.price_per_unit}</span>
-                        <span className="text-xs text-gray-400 font-medium">/ {product.unit || 'unit'}</span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded text-[10px] font-bold border border-indigo-100">
-                        MOQ: {product.moq} {product.unit || 'units'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Bottom: Buttons */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <button 
-                      onClick={() => triggerInquiryModal(product)}
-                      className="btn btn-secondary btn-sm"
-                      style={{ width: '100%', justifyContent: 'center' }}
-                    >
-                      Inquire
-                    </button>
-                    <button 
-                      onClick={(e) => triggerOrderModal(e, product)}
-                      className="btn btn-primary btn-sm"
-                      style={{ width: '100%', justifyContent: 'center' }}
-                    >
-                      Order
-                    </button>
-                  </div>
-
-                  {/* Supplier info at bottom */}
-                  <div className="mt-3 pt-3 border-t border-gray-50 flex items-center justify-between text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                     <span>Supplier: {product.wholesaler?.shop_name || 'Verified Seller'}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 5. MY CONNECTIONS TAB */}
+      {/* MY CONNECTIONS TAB */}
       {activeTab === 'connections' && (
         <div className="connections-tab-content animate-fade-in">
           {connLoading ? (
@@ -1817,9 +1776,9 @@ const ConnectFeature = () => {
                           key={msg.id} 
                           className={`msg-bubble ${isSender ? 'msg-bubble--sender' : 'msg-bubble--receiver'}`}
                         >
-                          <p style={{ margin: 0 }}>{msg.message}</p>
-                          <span className="msg-bubble__time">
-                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <p style={{ margin: 0 }}>{msg.content || msg.message || msg.text}</p>
+                      <span className="msg-bubble__time">
+                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
                       );

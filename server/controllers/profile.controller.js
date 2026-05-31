@@ -398,6 +398,35 @@ const reverseGeocode = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc  Get seller's own inventory products
+ * @route GET /api/profile/products/:id
+ */
+const getSellerProducts = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log("[SELLER PRODUCTS] Fetching products for user:", id);
+
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('user_id', id);
+
+    if (error) {
+      console.error("[SELLER PRODUCTS] DB error:", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    console.log(`[SELLER PRODUCTS] Found ${data?.length || 0} products`);
+
+    res.json({ products: data || [] });
+  } catch (err) {
+    console.error("[SELLER PRODUCTS] Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   updateLocation,
   markProfileComplete,
@@ -405,5 +434,6 @@ module.exports = {
   getRecommended,
   getTrending,
   getSellerProfile,
+  getSellerProducts,
   reverseGeocode,
 };

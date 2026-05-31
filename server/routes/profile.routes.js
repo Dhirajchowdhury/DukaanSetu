@@ -1,11 +1,14 @@
 const express = require('express');
-const { updateLocation, discoverProfiles, getSellerProfile, getRecommended, getTrending, markProfileComplete, reverseGeocode } = require('../controllers/profile.controller');
+const { updateLocation, discoverProfiles, getSellerProfile, getSellerProducts, getRecommended, getTrending, markProfileComplete, reverseGeocode } = require('../controllers/profile.controller');
 const { protect, optionalProtect } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
 // PUBLIC — no auth required
 router.get('/discover', discoverProfiles);
+
+// Public — get seller's own inventory products
+router.get('/products/:id', getSellerProducts);
 
 // Publicly accessible profile page with optional authentication to verify connection status
 router.get('/:id', optionalProtect, getSellerProfile);
