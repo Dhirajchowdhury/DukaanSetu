@@ -222,6 +222,9 @@ CREATE TABLE IF NOT EXISTS orders (
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_location TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS notes             TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE orders ALTER COLUMN product_id  DROP NOT NULL;
+ALTER TABLE orders ALTER COLUMN quantity    DROP NOT NULL;
+ALTER TABLE orders ALTER COLUMN total_price DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_orders_buyer_id  ON orders (buyer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_seller_id ON orders (seller_id);
@@ -233,18 +236,43 @@ CREATE TRIGGER trg_orders_updated_at
 BEFORE UPDATE ON orders
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+-- ── ORDER ITEMS (Multi-product orders) ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS order_items (
+  id         UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id   UUID            NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
+  product_id UUID            NOT NULL REFERENCES wholesaler_products (id) ON DELETE CASCADE,
+  quantity   INTEGER         NOT NULL CHECK (quantity > 0),
+  price      NUMERIC(12, 2)  NOT NULL CHECK (price >= 0),
+  created_at TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_oi_order_id   ON order_items (order_id);
+CREATE INDEX IF NOT EXISTS idx_oi_product_id ON order_items (product_id);
+
 -- ── CONNECTIONS ───────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS connections (
   id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id           UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   connected_user_id UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  status            TEXT        NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'accepted', 'rejected')),
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_user_connection UNIQUE (user_id, connected_user_id)
 );
 
+ALTER TABLE connections ADD COLUMN IF NOT EXISTS status    TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE connections ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
 CREATE INDEX IF NOT EXISTS idx_conn_user_id ON connections (user_id);
 CREATE INDEX IF NOT EXISTS idx_conn_connected_user_id ON connections (connected_user_id);
+CREATE INDEX IF NOT EXISTS idx_conn_status ON connections (status);
+
+DROP TRIGGER IF EXISTS trg_connections_updated_at ON connections;
+CREATE TRIGGER trg_connections_updated_at
+BEFORE UPDATE ON connections
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ── LOCATION & PROFILE EXTENSIONS ───────────────────────────────────────────
 ALTER TABLE users
@@ -316,6 +344,22 @@ CREATE INDEX IF NOT EXISTS idx_messages_conv_id    ON messages (conversation_id)
 CREATE INDEX IF NOT EXISTS idx_messages_created    ON messages (created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_messages_conv_created ON messages (conversation_id, created_at ASC);
 
+-- ── USER STATUS (Production Online Presence) ────────────────────────────────
+-- Persists online/offline status across server restarts.
+-- Updated by Socket.IO on connect/disconnect.
+CREATE TABLE IF NOT EXISTS user_status (
+  user_id    UUID        PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+  is_online  BOOLEAN     NOT NULL DEFAULT false,
+  last_seen  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_status_online ON user_status (is_online) WHERE is_online = true;
+
+-- ── CLIENT MESSAGE ID (Idempotent Message Delivery) ─────────────────────────
+-- Prevents duplicate message inserts on network retry.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS client_message_id UUID;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_id ON messages (client_message_id) WHERE client_message_id IS NOT NULL;
+
 -- ── INQUIRIES ─────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS inquiries (
@@ -353,6 +397,8 @@ ALTER TABLE orders             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE connections        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE conversations      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_status        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE order_items        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inquiries          ENABLE ROW LEVEL SECURITY;
 
 -- Service role bypasses all policies — no additional policies needed for backend.

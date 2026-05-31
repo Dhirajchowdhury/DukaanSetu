@@ -4,7 +4,7 @@ import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import {
   connectSocket, disconnectSocket, joinConversation,
-  sendMessage as socketSend, onMessage, offMessage, isConnected,
+  sendMessage as socketSend, onMessage, offMessage, isConnected, onReconnect,
 } from '../../services/socket';
 import { 
   FiSearch, FiMapPin, FiPackage, FiShoppingCart, FiMessageSquare, 
@@ -399,14 +399,19 @@ const ConnectFeature = () => {
       setOnlineUsers(prev => { const s = new Set(prev); s.delete(userId); return s; });
     });
 
-    // Re-join current conversation on reconnect
-    sock.on('connect', () => {
-      if (activeConvRef.current) {
-        joinConversation(activeConvRef.current);
+    // STEP 7: Re-join room + sync messages on reconnect
+    const unsubReconnect = onReconnect(() => {
+      const convId = activeConvRef.current;
+      if (convId) {
+        joinConversation(convId);
+        fetchLastMessages(convId);
       }
     });
 
-    return () => disconnectSocket();
+    return () => {
+      unsubReconnect();
+      disconnectSocket();
+    };
   }, []);
 
   // Join conversation room when active conversation changes
@@ -425,7 +430,10 @@ const ConnectFeature = () => {
       if (msg.conversation_id && msg.conversation_id !== activeConvRef.current) return;
       setMessages(prev => {
         if (prev.some(m => m.id === msg.id)) return prev;
-        return [...prev, msg];
+        // STEP 5: Always sort by created_at ASC
+        return [...prev, msg].sort(
+          (a, b) => new Date(a.created_at) - new Date(b.created_at)
+        );
       });
     });
     return () => offMessage();
@@ -879,6 +887,27 @@ const ConnectFeature = () => {
     }
   };
 
+  // STEP 7: Fetch last N messages for reconnect sync — merge with existing
+  const fetchLastMessages = async (convId, limit = 20) => {
+    try {
+      const { data } = await api.get(`/messages/${convId}`, {
+        params: { limit },
+      });
+      if (data.messages?.length > 0) {
+        setMessages(prev => {
+          const existingIds = new Set(prev.map(m => m.id));
+          const newMessages = data.messages.filter(m => !existingIds.has(m.id));
+          if (newMessages.length === 0) return prev;
+          return [...prev, ...newMessages].sort(
+            (a, b) => new Date(a.created_at) - new Date(b.created_at)
+          );
+        });
+      }
+    } catch (error) {
+      console.warn('[Messaging] Reconnect sync failed:', error.message);
+    }
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (sendingMessage) return;
@@ -904,6 +933,8 @@ const ConnectFeature = () => {
     }
 
     setSendingMessage(true);
+    // STEP 4: Generate unique client message ID for idempotent delivery
+    const clientMessageId = crypto.randomUUID();
     setNewMessage(''); // optimistic UI clear
 
     try {
@@ -927,12 +958,13 @@ const ConnectFeature = () => {
         }
       }
 
-      // Try Socket.IO first, fallback to HTTP
+      // Try Socket.IO first (with clientMessageId for dedup), fallback to HTTP
       try {
         await socketSend({
           conversationId: convId,
           content: messageText,
           senderId: sender_id,
+          clientMessageId,
         });
       } catch (socketErr) {
         console.warn('[Messaging] Socket send failed, falling back to HTTP:', socketErr.message);
@@ -941,6 +973,7 @@ const ConnectFeature = () => {
           sender_id,
           receiver_id,
           content: messageText,
+          client_message_id: clientMessageId,
         });
         const msgObj = data.message || {
           id: data.id || Math.random().toString(),
@@ -948,7 +981,9 @@ const ConnectFeature = () => {
           sender_id,
           created_at: new Date().toISOString(),
         };
-        setMessages(prev => [...prev, msgObj]);
+        setMessages(prev => [...prev, msgObj].sort(
+          (a, b) => new Date(a.created_at) - new Date(b.created_at)
+        ));
       }
     } catch (error) {
       console.error('[Messaging] Failed to send message:', error);

@@ -163,7 +163,7 @@ const getMessages = async (req, res, next) => {
       .select('id, text, sender_id, created_at')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true })
-      .limit(50);
+      .limit(parseInt(req.query.limit) || 50);
 
     if (error) throw error;
 
@@ -195,6 +195,7 @@ const sendMessage = async (req, res, next) => {
     const sender_id = req.body.sender_id || req.body.senderId || req.user?.id;
     const receiver_id = req.body.receiver_id || req.body.receiverId || req.body.otherUserId;
     const content = req.body.content || req.body.text || req.body.message;
+    const client_message_id = req.body.client_message_id || req.body.clientMessageId;
 
     // Strict validation: reject request if any field is missing
     if (!content || !content.trim()) {
@@ -271,19 +272,72 @@ const sendMessage = async (req, res, next) => {
       return res.status(403).json({ message: 'You can only message users you are connected with.' });
     }
 
+    // STEP 4: Idempotent insert — check for existing message by client_message_id
+    if (client_message_id) {
+      const { data: existing } = await supabase
+        .from('messages')
+        .select('id, text, sender_id, created_at')
+        .eq('client_message_id', client_message_id)
+        .maybeSingle();
+
+      if (existing) {
+        const normalized = {
+          id: existing.id,
+          content: existing.text,
+          sender_id: existing.sender_id,
+          created_at: existing.created_at,
+        };
+        console.log(`[API REQUEST ${reqId}] Duplicate message detected, returning existing.`);
+        return res.status(201).json({
+          message: normalized,
+          conversation_id: targetConvId,
+          sender_id,
+          receiver_id,
+          deduplicated: true,
+        });
+      }
+    }
+
     const { data: msg, error: msgErr } = await supabase
       .from('messages')
       .insert({
         conversation_id: targetConvId,
         sender_id:       sender_id,
         text:            content.trim(),
+        ...(client_message_id && { client_message_id }),
       })
       .select('id, text, sender_id, created_at')
       .single();
 
     console.log(`[API REQUEST ${reqId}] Supabase message insert response:`, { msg, msgErr });
 
-    if (msgErr) throw msgErr;
+    if (msgErr) {
+      // If duplicate key violation on client_message_id, fetch existing
+      if (client_message_id && msgErr.code === '23505') {
+        const { data: existing } = await supabase
+          .from('messages')
+          .select('id, text, sender_id, created_at')
+          .eq('client_message_id', client_message_id)
+          .single();
+
+        if (existing) {
+          const normalized = {
+            id: existing.id,
+            content: existing.text,
+            sender_id: existing.sender_id,
+            created_at: existing.created_at,
+          };
+          return res.status(201).json({
+            message: normalized,
+            conversation_id: targetConvId,
+            sender_id,
+            receiver_id,
+            deduplicated: true,
+          });
+        }
+      }
+      throw msgErr;
+    }
 
     const normalizedMsg = {
       id: msg.id,

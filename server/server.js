@@ -25,6 +25,7 @@ const inquiryRoutes      = require('./routes/inquiry.routes');
 const connectionRoutes   = require('./routes/connection.routes');
 const conversationsRoutes = require('./routes/conversations.routes');
 const messagesRoutes     = require('./routes/messages.routes');
+const analyticsRoutes    = require('./routes/analytics.routes');
 
 const app = express();
 
@@ -74,6 +75,7 @@ app.use('/api/inquiries',     inquiryRoutes);
 app.use('/api/connections',   connectionRoutes);
 app.use('/api/conversations', conversationsRoutes);
 app.use('/api/messages',      messagesRoutes);
+app.use('/api/analytics',     analyticsRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {

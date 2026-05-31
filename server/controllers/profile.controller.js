@@ -164,15 +164,19 @@ const getRecommended = async (req, res, next) => {
       .from('connections')
       .or(`user_id.eq.${req.user.id},connected_user_id.eq.${req.user.id}`);
 
-    const connectedSet = new Set();
+    const connectionMap = new Map();
     (userConns || []).forEach(c => {
-      connectedSet.add(c.user_id === req.user.id ? c.connected_user_id : c.user_id);
+      const otherId = c.user_id === req.user.id ? c.connected_user_id : c.user_id;
+      connectionMap.set(otherId, c.status);
     });
 
     let profiles = [];
 
     (users || []).forEach(user => {
       let products = (user.wholesaler_products || []).filter(p => p.stock_available > 0);
+
+      const connStatus = connectionMap.get(user.id) || null;
+      const isAccepted = connStatus === 'accepted';
 
       // Calculate distance
       let distance = null;
@@ -188,7 +192,7 @@ const getRecommended = async (req, res, next) => {
         );
       }
 
-      // Calculate aggregates
+      // Calculate aggregates (hide prices unless connected)
       let minPriceVal = Infinity;
       let maxPriceVal = -Infinity;
       products.forEach(p => {
@@ -208,9 +212,10 @@ const getRecommended = async (req, res, next) => {
         state: user.state,
         is_profile_complete: user.is_profile_complete,
         total_products: products.length,
-        min_price: minPriceVal === Infinity ? 0 : minPriceVal,
-        max_price: maxPriceVal === -Infinity ? 0 : maxPriceVal,
-        isConnected: connectedSet.has(user.id),
+        min_price: isAccepted ? (minPriceVal === Infinity ? 0 : minPriceVal) : null,
+        max_price: isAccepted ? (maxPriceVal === -Infinity ? 0 : maxPriceVal) : null,
+        isConnected: connStatus !== null && connStatus !== 'rejected',
+        connectionStatus: connStatus,
         // Flags for UI predictability and defensive fallbacks
         hasProducts: products.length > 0,
         hasLocation: user.latitude != null && user.longitude != null,
@@ -227,14 +232,16 @@ const getRecommended = async (req, res, next) => {
           is_profile_complete: user.is_profile_complete,
         },
         productCount: products.length,
-        minPrice: minPriceVal === Infinity ? 0 : minPriceVal,
-        maxPrice: maxPriceVal === -Infinity ? 0 : maxPriceVal,
+        minPrice: isAccepted ? (minPriceVal === Infinity ? 0 : minPriceVal) : null,
+        maxPrice: isAccepted ? (maxPriceVal === -Infinity ? 0 : maxPriceVal) : null,
         distance: distance !== null ? Math.round(distance * 10) / 10 : null,
         distance_km: distance !== null ? Math.round(distance * 10) / 10 : null,
         topProducts: [...products]
           .sort((a, b) => a.price_per_unit - b.price_per_unit)
           .slice(0, 3)
-          .map(({ id, product_name, price_per_unit, unit }) => ({ id, product_name, price_per_unit, unit })),
+          .map(({ id, product_name, price_per_unit, unit }) => ({
+            id, product_name, price_per_unit, unit,
+          })),
       });
     });
 
@@ -359,16 +366,33 @@ const getSellerProfile = async (req, res, next) => {
     }
 
     const currentUserId = req.user?.id;
-    const isConnected = currentUserId
-      ? (conn || []).some(c => 
+    const connection = currentUserId
+      ? (conn || []).find(c => 
           (c.user_id === currentUserId && c.connected_user_id === profileId) ||
           (c.user_id === profileId && c.connected_user_id === currentUserId)
         )
-      : false;
+      : null;
+    const isConnected = !!connection;
+    const isAccepted = connection?.status === 'accepted';
 
-    console.log(`[API REQUEST ${reqId}] Successfully fetched profile for ${seller.shop_name}, connected: ${isConnected}`);
+    console.log(`[API REQUEST ${reqId}] Successfully fetched profile for ${seller.shop_name}, connected: ${isConnected}, accepted: ${isAccepted}`);
 
-    res.json({ seller: { ...seller, isConnected }, listings: listings || [] });
+    // STEP 5: Hide prices unless connection is accepted
+    const visibleListings = (listings || []).map(p => {
+      if (!isAccepted) {
+        return { ...p, price_per_unit: null, moq: null };
+      }
+      return p;
+    });
+
+    res.json({
+      seller: {
+        ...seller,
+        isConnected,
+        connectionStatus: connection?.status || null,
+      },
+      listings: visibleListings,
+    });
   } catch (error) {
     console.error(`[API REQUEST ${reqId}] Error in getSellerProfile:`, error);
     next(error);

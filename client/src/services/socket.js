@@ -2,6 +2,7 @@ import { io } from 'socket.io-client';
 import { API_URL } from '../config/api';
 
 let socket = null;
+let reconnectHandlers = [];
 
 export function connectSocket(token) {
   if (socket?.connected) return socket;
@@ -22,10 +23,23 @@ export function connectSocket(token) {
     console.warn('[socket] Disconnected:', reason);
   });
 
+  socket.on('connect', () => {
+    console.log('[socket] Connected / Reconnected');
+    reconnectHandlers.forEach(fn => fn());
+  });
+
   return socket;
 }
 
+export function onReconnect(handler) {
+  reconnectHandlers.push(handler);
+  return () => {
+    reconnectHandlers = reconnectHandlers.filter(h => h !== handler);
+  };
+}
+
 export function disconnectSocket() {
+  reconnectHandlers = [];
   if (socket) {
     socket.removeAllListeners();
     socket.disconnect();
@@ -39,13 +53,18 @@ export function joinConversation(conversationId) {
   }
 }
 
+// STEP 3: ACK with 5s timeout
 export function sendMessage(data) {
   return new Promise((resolve, reject) => {
     if (!socket?.connected) {
       reject(new Error('Socket not connected'));
       return;
     }
-    socket.emit('send_message', data, (response) => {
+    socket.timeout(5000).emit('send_message', data, (err, response) => {
+      if (err) {
+        reject(new Error(err.message || 'Socket ACK timeout'));
+        return;
+      }
       if (response?.error) reject(new Error(response.error));
       else resolve(response);
     });
