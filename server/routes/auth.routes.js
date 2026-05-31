@@ -36,7 +36,10 @@ router.get('/google',
 );
 
 router.get('/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: `https://dukaansetu.vercel.app/login` }),
+  (req, res, next) => {
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    passport.authenticate('google', { session: false, failureRedirect: `${clientUrl}/login` })(req, res, next);
+  },
   (req, res) => {
     // req.user is the raw Supabase row — use .id (not ._id)
     const accessToken  = generateAccessToken(req.user.id, req.user.role);
@@ -49,8 +52,9 @@ router.get('/google/callback',
       maxAge:   7 * 24 * 60 * 60 * 1000,
     });
 
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
     res.redirect(
-      `https://dukaansetu.vercel.app/auth/callback?token=${accessToken}&role=${req.user.role}`
+      `${clientUrl}/auth/callback?token=${accessToken}&role=${req.user.role}`
     );
   }
 );

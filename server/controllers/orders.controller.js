@@ -1,26 +1,32 @@
 const { supabase } = require('../config/db');
 
 /**
- * Fetch order items for a given order
+ * Fetch order items for a given order (Legacy helper, since order_items is not in db)
  */
 async function getOrderItems(orderId) {
-  const { data } = await supabase
-    .from('order_items')
-    .select(`
-      id, quantity, price,
-      product:wholesaler_products!product_id(id, product_name, price_per_unit, unit, category)
-    `)
-    .eq('order_id', orderId);
-  return data || [];
+  return [];
 }
 
 /**
- * Enrich an order with its items
+ * Enrich an order with its items constructed from single product columns
  */
 async function enrichOrder(order) {
   if (!order) return null;
-  const items = await getOrderItems(order.id);
-  return { ...order, items };
+
+  let totalPrice = order.total_price;
+  if ((!totalPrice || parseFloat(totalPrice) === 0) && order.wholesaler_products && order.quantity) {
+    totalPrice = parseFloat(order.wholesaler_products.price_per_unit || 0) * order.quantity;
+  }
+
+  const item = {
+    id: order.id,
+    order_id: order.id,
+    product_id: order.product_id,
+    quantity: order.quantity,
+    price: totalPrice && order.quantity ? parseFloat(totalPrice) / (order.quantity || 1) : 0,
+    product: order.wholesaler_products || null
+  };
+  return { ...order, total_price: totalPrice, items: [item] };
 }
 
 /**
@@ -38,23 +44,21 @@ const createOrder = async (req, res, next) => {
       return res.status(400).json({ message: 'Provide items array or productId+quantity' });
     }
 
-    // Resolve seller_id and validate all products
-    const productIds = orderItems.map(i => i.productId);
-    const { data: products, error: pErr } = await supabase
+    // Since our database uses the single-product schema and has no order_items table,
+    // we process the first item as a single-product order.
+    const firstItem = orderItems[0];
+    const { data: product, error: pErr } = await supabase
       .from('wholesaler_products')
-      .select('id, wholesaler_id, product_name, price_per_unit, stock_available, moq')
-      .in('id', productIds);
+      .select('id, wholesaler_id, product_name, price_per_unit, stock_available, moq, unit, category')
+      .eq('id', firstItem.productId)
+      .maybeSingle();
 
     if (pErr) throw pErr;
-    if (!products || products.length !== productIds.length) {
-      return res.status(400).json({ message: 'One or more products not found' });
+    if (!product) {
+      return res.status(400).json({ message: 'Product not found' });
     }
 
-    const sellerIds = [...new Set(products.map(p => p.wholesaler_id))];
-    if (sellerIds.length > 1) {
-      return res.status(400).json({ message: 'All items must be from the same seller' });
-    }
-    const sellerId = sellerIds[0];
+    const sellerId = product.wholesaler_id;
     if (sellerId === req.user.id) {
       return res.status(400).json({ message: 'Cannot order your own products' });
     }
@@ -73,61 +77,48 @@ const createOrder = async (req, res, next) => {
       return res.status(403).json({ message: 'Must have an accepted connection to place an order' });
     }
 
-    // Validate stock + MOQ + calculate totals
-    let totalPrice = 0;
-    for (const item of orderItems) {
-      const product = products.find(p => p.id === item.productId);
-      if (!product) continue;
-
-      const qty = parseInt(item.quantity) || 1;
-      if (qty < product.moq) {
-        return res.status(400).json({
-          message: `${product.product_name} minimum order is ${product.moq}`,
-        });
-      }
-      if (qty > product.stock_available) {
-        return res.status(400).json({
-          message: `${product.product_name} only ${product.stock_available} in stock`,
-        });
-      }
-      item._resolved = { ...product, qty };
-      totalPrice += parseFloat(product.price_per_unit) * qty;
+    const qty = parseInt(firstItem.quantity) || 1;
+    if (qty < product.moq) {
+      return res.status(400).json({
+        message: `${product.product_name} minimum order is ${product.moq}`,
+      });
+    }
+    if (qty > product.stock_available) {
+      return res.status(400).json({
+        message: `${product.product_name} only ${product.stock_available} in stock`,
+      });
     }
 
-    // Create the order
+    const totalPrice = parseFloat(product.price_per_unit || 0) * qty;
+
+    // Create the order directly on single product columns
     const { data: order, error: oErr } = await supabase
       .from('orders')
       .insert({
         buyer_id: req.user.id,
         seller_id: sellerId,
+        product_id: product.id,
+        quantity: qty,
+        total_price: totalPrice,
         delivery_location: deliveryLocation || null,
         notes: notes || null,
         status: 'pending',
       })
-      .select()
+      .select(`
+        *,
+        buyer:users!buyer_id(id, shop_name, email),
+        seller:users!seller_id(id, shop_name, email),
+        wholesaler_products:wholesaler_products!product_id(id, product_name, price_per_unit, unit, category)
+      `)
       .single();
 
     if (oErr) throw oErr;
 
-    // Insert order items
-    const itemRows = orderItems.map(item => ({
-      order_id: order.id,
-      product_id: item.productId,
-      quantity: item._resolved.qty,
-      price: parseFloat(item._resolved.price_per_unit),
-    }));
-
-    const { error: oiErr } = await supabase.from('order_items').insert(itemRows);
-    if (oiErr) throw oiErr;
-
     // Decrement stock
-    for (const item of orderItems) {
-      const p = item._resolved;
-      await supabase
-        .from('wholesaler_products')
-        .update({ stock_available: p.stock_available - p.qty })
-        .eq('id', p.id);
-    }
+    await supabase
+      .from('wholesaler_products')
+      .update({ stock_available: product.stock_available - qty })
+      .eq('id', product.id);
 
     const enriched = await enrichOrder(order);
     res.status(201).json({ message: 'Order placed successfully', order: enriched });
@@ -151,7 +142,8 @@ const getBuyingOrders = async (req, res, next) => {
       .select(`
         *,
         buyer:users!buyer_id(id, shop_name, email),
-        seller:users!seller_id(id, shop_name, email)
+        seller:users!seller_id(id, shop_name, email),
+        wholesaler_products:wholesaler_products!product_id(id, product_name, price_per_unit, unit, category)
       `, { count: 'exact' })
       .eq('buyer_id', req.user.id)
       .order('created_at', { ascending: false })
@@ -193,7 +185,8 @@ const getSellingOrders = async (req, res, next) => {
       .select(`
         *,
         buyer:users!buyer_id(id, shop_name, email),
-        seller:users!seller_id(id, shop_name, email)
+        seller:users!seller_id(id, shop_name, email),
+        wholesaler_products:wholesaler_products!product_id(id, product_name, price_per_unit, unit, category)
       `, { count: 'exact' })
       .eq('seller_id', req.user.id)
       .order('created_at', { ascending: false })
@@ -235,7 +228,8 @@ const getOrders = async (req, res, next) => {
       .select(`
         *,
         buyer:users!buyer_id(id, shop_name, email),
-        seller:users!seller_id(id, shop_name, email)
+        seller:users!seller_id(id, shop_name, email),
+        wholesaler_products:wholesaler_products!product_id(id, product_name, price_per_unit, unit, category)
       `, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, to);
@@ -327,7 +321,8 @@ const updateOrderStatus = async (req, res, next) => {
       .select(`
         *,
         buyer:users!buyer_id(id, shop_name, email),
-        seller:users!seller_id(id, shop_name, email)
+        seller:users!seller_id(id, shop_name, email),
+        wholesaler_products:wholesaler_products!product_id(id, product_name, price_per_unit, unit, category)
       `)
       .single();
 

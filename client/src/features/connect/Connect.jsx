@@ -204,7 +204,7 @@ const SupplierCard = React.memo(({
           </p>
           <p style={{ margin: '6px 0', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)' }}>
             <span style={{ fontSize: '14px' }}>💰</span>
-            <span>{totalProducts > 0 ? `₹${minPrice} - ₹${maxPrice}` : "Connect to request catalog"}</span>
+            <span>{totalProducts > 0 && minPrice !== null && minPrice !== 0 ? `₹${minPrice} - ₹${maxPrice}` : "Connect to request catalog"}</span>
           </p>
 
           {distance !== null && (
@@ -1220,56 +1220,73 @@ const ConnectFeature = () => {
             <p>This seller hasn't listed any wholesale products yet.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="wholesaler-grid animate-fade-in">
             {listings.map((product) => {
               if (!product) return null;
+              const isAccepted = sellerProfile?.connectionStatus === 'accepted';
+              
               return (
-                <div key={product.id} className="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between" style={{ minHeight: "220px", borderRadius: "16px" }}>
+                <div key={product.id} className="wholesaler-card">
                   {/* Top: Name, Category, Location */}
-                  <div className="mb-3">
-                    <div className="flex justify-between items-start gap-2 mb-1.5">
-                      <h3 className="text-sm font-bold text-gray-900 line-clamp-2" style={{ margin: 0 }}>{product.product_name}</h3>
-                      <span className="bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full text-[10px] font-bold border border-teal-100 flex-shrink-0">
-                        {product.category}
-                      </span>
+                  <div>
+                    <div className="wholesaler-card__header">
+                      <h4 className="wholesaler-card__title" title={product.product_name}>{product.product_name}</h4>
+                      {product.category && (
+                        <span className="wholesaler-card__category">
+                          {product.category}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-xs text-gray-400 flex items-center gap-1" style={{ margin: 0 }}>
-                      <FiMapPin className="text-teal-500" /> {product.location || 'Pan India'}
+                    <p className="wholesaler-card__location">
+                      📍 {product.location || 'Pan India'}
                     </p>
                   </div>
 
                   {/* Middle: Price, Unit, MOQ */}
-                  <div className="mb-4 pt-3 border-t border-gray-50 flex justify-between items-end">
-                    <div>
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold" style={{ margin: 0 }}>Price</p>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-lg font-black text-indigo-600">₹{product.price_per_unit}</span>
-                        <span className="text-xs text-gray-400 font-medium">/ {product.unit || 'unit'}</span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded text-[10px] font-bold border border-indigo-100">
-                        MOQ: {product.moq} {product.unit || 'units'}
+                  <div className="wholesaler-card__body">
+                    <div className="wholesaler-card__price-wrapper">
+                      <span className="wholesaler-card__label">Price</span>
+                      <span className="wholesaler-card__price">
+                        {product.price_per_unit ? `₹${product.price_per_unit}` : 'Price Hidden'}
+                        {product.price_per_unit && <span className="wholesaler-card__unit"> / {product.unit || 'unit'}</span>}
                       </span>
                     </div>
+                    
+                    {product.moq && (
+                      <span className="wholesaler-card__moq">
+                        MOQ: {product.moq}
+                      </span>
+                    )}
                   </div>
 
                   {/* Bottom: Buttons */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 'auto' }}>
+                  <div className="wholesaler-card__actions">
                     <button 
                       onClick={(e) => { e.stopPropagation(); triggerInquiryModal(product); }}
                       className="btn btn-secondary btn-sm"
-                      style={{ width: '100%', justifyContent: 'center' }}
                     >
                       Inquire
                     </button>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); triggerOrderModal(e, product); }}
-                      className="btn btn-primary btn-sm"
-                      style={{ width: '100%', justifyContent: 'center' }}
-                    >
-                      Order
-                    </button>
+                    {isAccepted ? (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); triggerOrderModal(e, product); }}
+                        className="btn btn-primary btn-sm"
+                      >
+                        Order
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          toast.error("You must have an approved connection to place orders with this supplier. Click 'Connect' above to request access."); 
+                        }}
+                        className="btn btn-primary btn-sm"
+                        style={{ opacity: 0.65, cursor: 'not-allowed' }}
+                        title="Connection required to order"
+                      >
+                        🔒 Order
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -1286,28 +1303,47 @@ const ConnectFeature = () => {
             <p>This seller hasn't added any inventory products yet.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sellerProducts.map((product) => (
-              <div key={product.id} className="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex flex-col justify-between" style={{ minHeight: "200px", borderRadius: "16px" }}>
-                <div>
-                  <h4 className="text-sm font-bold text-gray-900" style={{ margin: 0 }}>{product.product_name}</h4>
-                  {product.brand && <p className="text-xs text-gray-400" style={{ margin: '4px 0 0' }}>{product.brand}</p>}
-                  <div className="mt-3 flex justify-between items-end">
-                    <div>
-                      <p className="text-[10px] text-gray-400 uppercase font-semibold" style={{ margin: 0 }}>Price</p>
-                      <span className="text-lg font-black text-indigo-600">₹{product.selling_price || product.cost_price || 0}</span>
-                      <span className="text-xs text-gray-400 ml-1">/ {product.unit || 'unit'}</span>
+          <div className="inventory-grid animate-fade-in">
+            {sellerProducts.map((product) => {
+              const isLowStock = product.quantity <= (product.low_stock_threshold || 10);
+              const isExpiringAlert = product.expiry_date && (new Date(product.expiry_date) - new Date() < 7 * 24 * 60 * 60 * 1000);
+              
+              return (
+                <div key={product.id} className="inventory-card">
+                  <div className="inventory-card__header">
+                    {product.brand && <span className="inventory-card__brand">{product.brand}</span>}
+                    <h4 className="inventory-card__title">{product.product_name}</h4>
+                  </div>
+                  
+                  <div className="inventory-card__body">
+                    <div className="inventory-card__price-wrapper">
+                      <span className="inventory-card__label">Price</span>
+                      <span className="inventory-card__price">
+                        ₹{product.selling_price || product.cost_price || 0}
+                        <span className="inventory-card__unit"> / {product.unit || 'pc'}</span>
+                      </span>
                     </div>
-                    <div className="text-right">
-                      <span className="text-xs font-semibold">Qty: {product.quantity || 0}</span>
+                    
+                    <div className="inventory-card__stock-wrapper">
+                      <span className="inventory-card__label">Stock Level</span>
+                      <span className={`inventory-card__stock ${isLowStock ? 'inventory-card__stock--low' : ''}`}>
+                        {isLowStock ? '⚠️ ' : '📦 '}
+                        {product.quantity || 0}
+                      </span>
                     </div>
                   </div>
+
+                  {product.expiry_date && (
+                    <div className="inventory-card__footer">
+                      <span className={`inventory-card__expiry ${isExpiringAlert ? 'inventory-card__expiry--alert' : ''}`}>
+                        {isExpiringAlert ? '🕒 Near Expiry' : '📅 Expiry Date'}
+                      </span>
+                      <span>{new Date(product.expiry_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    </div>
+                  )}
                 </div>
-                {product.expiry_date && (
-                  <p className="text-xs text-gray-400 mt-2" style={{ margin: 0 }}>Exp: {new Date(product.expiry_date).toLocaleDateString()}</p>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -2006,71 +2042,83 @@ const ConnectFeature = () => {
             </div>
             <form onSubmit={handlePlaceOrderSubmit}>
               <div className="modal-body">
-                <div>
-                  <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary-muted)', padding: 16, borderRadius: 12, marginBottom: 20 }}>
-                    <h4 style={{ margin: '0 0 8px 0', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{selectedOrderProduct.product_name}</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13, color: 'var(--text-secondary)' }}>
-                      <div>💰 Unit Price: <strong>₹{selectedOrderProduct.price_per_unit}</strong></div>
-                      <div>📦 Available Stock: <strong>{selectedOrderProduct.stock_available} {selectedOrderProduct.unit || 'units'}</strong></div>
-                      {selectedOrderProduct.moq > 0 && (
-                        <div style={{ gridColumn: 'span 2' }}>
-                          ⚠️ Minimum Order Quantity (MOQ): <strong>{selectedOrderProduct.moq} {selectedOrderProduct.unit || 'units'}</strong>
-                        </div>
-                      )}
+                {!selectedOrderProduct.price_per_unit || parseFloat(selectedOrderProduct.price_per_unit) <= 0 ? (
+                  <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: 18, borderRadius: 12, marginBottom: 10, textAlign: 'center' }}>
+                    <span style={{ fontSize: '32px', display: 'block', marginBottom: '8px' }}>🔒</span>
+                    <p style={{ color: '#ef4444', fontWeight: 700, fontSize: '14.5px', margin: '0 0 6px 0' }}>
+                      Connection Approval Required
+                    </p>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
+                      You must establish and approve a B2B connection with this seller to view catalog prices and place direct orders. Click the 'Connect' button on their profile to request access.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary-muted)', padding: 16, borderRadius: 12, marginBottom: 20 }}>
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{selectedOrderProduct.product_name}</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13, color: 'var(--text-secondary)' }}>
+                        <div>💰 Unit Price: <strong>₹{selectedOrderProduct.price_per_unit}</strong></div>
+                        <div>📦 Available Stock: <strong>{selectedOrderProduct.stock_available} {selectedOrderProduct.unit || 'units'}</strong></div>
+                        {selectedOrderProduct.moq > 0 && (
+                          <div style={{ gridColumn: 'span 2' }}>
+                            ⚠️ Minimum Order Quantity (MOQ): <strong>{selectedOrderProduct.moq} {selectedOrderProduct.unit || 'units'}</strong>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Quantity</label>
+                      <input 
+                        type="number" 
+                        min={selectedOrderProduct.moq || 1}
+                        max={selectedOrderProduct.stock_available}
+                        required 
+                        className="form-input" 
+                        value={orderQty}
+                        onChange={(e) => setOrderQty(parseInt(e.target.value) || '')}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Delivery Location</label>
+                      <input 
+                        type="text" 
+                        required 
+                        className="form-input" 
+                        value={orderDeliveryLocation}
+                        onChange={(e) => setOrderDeliveryLocation(e.target.value)}
+                        placeholder="Enter exact delivery address..."
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Notes for Seller (Optional)</label>
+                      <textarea 
+                        rows="3" 
+                        className="form-textarea"
+                        value={orderNotes}
+                        onChange={(e) => setOrderNotes(e.target.value)}
+                        placeholder="Add any specific delivery instructions..."
+                      />
+                    </div>
+
+                    {/* live computation */}
+                    <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Total Price:</span>
+                      <span style={{ fontSize: 24, fontWeight: 900, color: 'var(--primary)' }}>
+                        ₹{((parseInt(orderQty) || 0) * (selectedOrderProduct.price_per_unit || 0)).toFixed(2)}
+                      </span>
                     </div>
                   </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Quantity</label>
-                    <input 
-                      type="number" 
-                      min={selectedOrderProduct.moq || 1}
-                      max={selectedOrderProduct.stock_available}
-                      required 
-                      className="form-input" 
-                      value={orderQty}
-                      onChange={(e) => setOrderQty(parseInt(e.target.value) || '')}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Delivery Location</label>
-                    <input 
-                      type="text" 
-                      required 
-                      className="form-input" 
-                      value={orderDeliveryLocation}
-                      onChange={(e) => setOrderDeliveryLocation(e.target.value)}
-                      placeholder="Enter exact delivery address..."
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Notes for Seller (Optional)</label>
-                    <textarea 
-                      rows="3" 
-                      className="form-textarea"
-                      value={orderNotes}
-                      onChange={(e) => setOrderNotes(e.target.value)}
-                      placeholder="Add any specific delivery instructions..."
-                    />
-                  </div>
-
-                  {/* live computation */}
-                  <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Total Price:</span>
-                    <span style={{ fontSize: 24, fontWeight: 900, color: 'var(--primary)' }}>
-                      ₹{((parseInt(orderQty) || 0) * (selectedOrderProduct.price_per_unit || 0)).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
+                )}
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowOrderModal(false)}>Cancel</button>
                 <button 
                   type="submit" 
                   className="btn btn-primary" 
-                  disabled={placingOrder || !orderQty || orderQty < selectedOrderProduct.moq || orderQty > selectedOrderProduct.stock_available}
+                  disabled={placingOrder || !orderQty || orderQty < selectedOrderProduct.moq || orderQty > selectedOrderProduct.stock_available || !selectedOrderProduct.price_per_unit || parseFloat(selectedOrderProduct.price_per_unit) <= 0}
                 >
                   {placingOrder ? 'Placing Order...' : 'Place Order'}
                 </button>

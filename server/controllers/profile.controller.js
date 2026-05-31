@@ -113,27 +113,195 @@ const markProfileComplete = async (req, res, next) => {
   }
 };
 
-/**
- * @desc  Discovery feed — FULLY PUBLIC. Returns all non-deleted supplier-type users.
- * @route GET /api/profile/discover
- */
 const discoverProfiles = async (req, res) => {
   try {
     console.log("🔥 DISCOVER HIT");
     console.log("req.user:", req.user);
+    console.log("req.query:", req.query);
 
-    const { data, error } = await supabase
+    const { search, role, minPrice, maxPrice, location, sortBy, maxDistance, page = 1, limit = 12 } = req.query;
+
+    let query = supabase
       .from('users')
-      .select('id, shop_name, role, city, state');
+      .select(`
+        id, email, shop_name, role, latitude, longitude, address, city, state, is_profile_complete, created_at,
+        wholesaler_products:wholesaler_products(*)
+      `)
+      .in('role', ['wholesaler', 'distributor', 'producer'])
+      .not('shop_name', 'is', null)
+      .eq('is_deleted', false);
 
-    if (error) {
-      console.error("DISCOVER ERROR:", error);
-      return res.status(500).json({ error: error.message });
+    if (role) {
+      query = query.eq('role', role);
     }
 
-    console.log("🔥 DISCOVER data:", data);
+    const { data: users, error } = await query;
+    if (error) throw error;
 
-    res.json({ profiles: data || [] });
+    // Fetch current user's connections if authenticated to verify status
+    const connectionMap = new Map();
+    if (req.user?.id) {
+      const { data: userConns } = await supabase
+        .from('connections')
+        .select('user_id, connected_user_id, status')
+        .or(`user_id.eq.${req.user.id},connected_user_id.eq.${req.user.id}`);
+
+      (userConns || []).forEach(c => {
+        const otherId = c.user_id === req.user.id ? c.connected_user_id : c.user_id;
+        connectionMap.set(otherId, c.status);
+      });
+    }
+
+    let profiles = [];
+
+    (users || []).forEach(user => {
+      let products = (user.wholesaler_products || []).filter(p => p.stock_available > 0);
+
+      const connStatus = connectionMap.get(user.id) || null;
+      const isAccepted = connStatus === 'accepted';
+      const isConnected = connStatus !== null && connStatus !== 'rejected';
+
+      // 1. Calculate distance (Haversine formula in-memory)
+      let distance = null;
+      if (
+        req.user?.latitude && req.user?.longitude &&
+        user.latitude && user.longitude
+      ) {
+        distance = getDistanceKm(
+          parseFloat(req.user.latitude),
+          parseFloat(req.user.longitude),
+          parseFloat(user.latitude),
+          parseFloat(user.longitude)
+        );
+      }
+
+      // 2. Perform filters in-memory
+      // A. Search filter
+      if (search) {
+        const searchLower = search.toLowerCase();
+        const matchesShop = user.shop_name?.toLowerCase().includes(searchLower);
+        const matchesProduct = products.some(p => p.product_name?.toLowerCase().includes(searchLower));
+        if (!matchesShop && !matchesProduct) return;
+      }
+
+      // B. Location filter
+      if (location) {
+        const locLower = location.toLowerCase();
+        const matchesAddr = (user.address?.toLowerCase().includes(locLower) ||
+                             user.city?.toLowerCase().includes(locLower) ||
+                             user.state?.toLowerCase().includes(locLower));
+        if (!matchesAddr) return;
+      }
+
+      // C. Price range filters
+      let minPriceVal = Infinity;
+      let maxPriceVal = -Infinity;
+      products.forEach(p => {
+        if (p.price_per_unit < minPriceVal) minPriceVal = p.price_per_unit;
+        if (p.price_per_unit > maxPriceVal) maxPriceVal = p.price_per_unit;
+      });
+
+      if (minPrice && minPriceVal !== Infinity && minPriceVal < parseFloat(minPrice)) {
+        // If they filter by minPrice, ensure at least one product is above or equal to it
+        const hasValidPrice = products.some(p => p.price_per_unit >= parseFloat(minPrice));
+        if (!hasValidPrice) return;
+      }
+      if (maxPrice && maxPriceVal !== -Infinity && maxPriceVal > parseFloat(maxPrice)) {
+        // If they filter by maxPrice, ensure at least one product is below or equal to it
+        const hasValidPrice = products.some(p => p.price_per_unit <= parseFloat(maxPrice));
+        if (!hasValidPrice) return;
+      }
+
+      // E. Distance filter
+      if (maxDistance && distance !== null && distance > parseFloat(maxDistance)) {
+        return;
+      }
+
+      // If all filters passed, build the profile card data structure
+      profiles.push({
+        id: user.id,
+        name: user.shop_name,
+        shop_name: user.shop_name,
+        role: user.role,
+        latitude: user.latitude,
+        longitude: user.longitude,
+        address: user.address,
+        city: user.city,
+        state: user.state,
+        is_profile_complete: user.is_profile_complete,
+        total_products: products.length,
+        min_price: isAccepted ? (minPriceVal === Infinity ? 0 : minPriceVal) : null,
+        max_price: isAccepted ? (maxPriceVal === -Infinity ? 0 : maxPriceVal) : null,
+        isConnected,
+        connectionStatus: connStatus,
+        hasProducts: products.length > 0,
+        hasLocation: user.latitude != null && user.longitude != null,
+        wholesaler: {
+          id: user.id,
+          shop_name: user.shop_name,
+          role: user.role,
+          latitude: user.latitude,
+          longitude: user.longitude,
+          address: user.address,
+          city: user.city,
+          state: user.state,
+          is_profile_complete: user.is_profile_complete,
+        },
+        productCount: products.length,
+        minPrice: isAccepted ? (minPriceVal === Infinity ? 0 : minPriceVal) : null,
+        maxPrice: isAccepted ? (maxPriceVal === -Infinity ? 0 : maxPriceVal) : null,
+        distance: distance !== null ? Math.round(distance * 10) / 10 : null,
+        distance_km: distance !== null ? Math.round(distance * 10) / 10 : null,
+        topProducts: [...products]
+          .sort((a, b) => a.price_per_unit - b.price_per_unit)
+          .slice(0, 3)
+          .map(({ id, product_name, price_per_unit, unit }) => ({
+            id, product_name, price_per_unit, unit,
+          })),
+      });
+    });
+
+    // 3. Sorting logic
+    if (sortBy === 'nearest') {
+      profiles.sort((a, b) => {
+        if (a.distance_km === null) return 1;
+        if (b.distance_km === null) return -1;
+        return a.distance_km - b.distance_km;
+      });
+    } else if (sortBy === 'lowest_price') {
+      profiles.sort((a, b) => {
+        const aPrice = a.minPrice === null ? Infinity : a.minPrice;
+        const bPrice = b.minPrice === null ? Infinity : b.minPrice;
+        return aPrice - bPrice;
+      });
+    } else {
+      // Default: sort by a proximity/size score
+      const distances = profiles.map(p => p.distance_km).filter(d => d !== null);
+      const maxDist = distances.length > 0 ? Math.max(...distances, 1) : 1;
+      const counts = profiles.map(p => p.productCount);
+      const maxCount = counts.length > 0 ? Math.max(...counts, 1) : 1;
+
+      profiles.forEach(p => {
+        const distScore = p.distance_km !== null ? p.distance_km / maxDist : 0.5;
+        const countScore = maxCount > 0 ? 1 - p.productCount / maxCount : 0.5;
+        p._score = 0.6 * distScore + 0.4 * countScore;
+      });
+      profiles.sort((a, b) => a._score - b._score);
+    }
+
+    // 4. In-memory pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const startIndex = (pageNum - 1) * limitNum;
+    const paginatedProfiles = profiles.slice(startIndex, startIndex + limitNum);
+
+    res.json({
+      profiles: paginatedProfiles,
+      totalCount: profiles.length,
+      page: pageNum,
+      totalPages: Math.ceil(profiles.length / limitNum),
+    });
+
   } catch (err) {
     console.error("DISCOVER ERROR:", err);
     res.status(500).json({ error: err.message });

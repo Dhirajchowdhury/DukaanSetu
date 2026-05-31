@@ -4,8 +4,8 @@ const { protect, optionalProtect } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
-// PUBLIC — no auth required
-router.get('/discover', discoverProfiles);
+// PUBLIC — optionally authenticated to check connection status
+router.get('/discover', optionalProtect, discoverProfiles);
 
 // Public — get seller's own inventory products
 router.get('/products/:id', getSellerProducts);

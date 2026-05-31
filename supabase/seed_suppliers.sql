@@ -15,6 +15,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT F
 UPDATE users SET shop_name = email WHERE shop_name IS NULL;
 
 -- RLS: allow public reads on users table
+
 DROP POLICY IF EXISTS "Allow read users" ON users;
 CREATE POLICY "Allow read users" ON users FOR SELECT USING (true);
 
