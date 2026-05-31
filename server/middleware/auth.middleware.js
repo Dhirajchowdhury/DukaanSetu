@@ -26,7 +26,7 @@ const protect = async (req, res, next) => {
       .single();
 
     if (error || !user) {
-      return res.status(401).json({ message: 'User not found' });
+      return res.status(401).json({ message: 'Unauthorized' });
     }
 
     // Normalise to camelCase so controllers stay consistent

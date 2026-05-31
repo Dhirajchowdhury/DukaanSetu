@@ -70,6 +70,17 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', database: 'Supabase (PostgreSQL)', timestamp: new Date().toISOString() });
 });
 
+// ── Debug: check env vars are loaded ──────────────────────────────────────────
+app.get('/debug', (req, res) => {
+  res.json({
+    env: {
+      supabaseUrl: process.env.SUPABASE_URL ? 'SET' : 'MISSING',
+      supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'MISSING',
+      nodeEnv: process.env.NODE_ENV,
+    },
+  });
+});
+
 // ── Error handler ─────────────────────────────────────────────────────────────
 app.use(errorHandler);
 

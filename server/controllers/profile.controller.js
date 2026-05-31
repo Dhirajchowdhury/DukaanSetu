@@ -114,33 +114,29 @@ const markProfileComplete = async (req, res, next) => {
 };
 
 /**
- * @desc  Discovery feed with role filter, search, price range, sort
+ * @desc  Discovery feed — FULLY PUBLIC. Returns all non-deleted supplier-type users.
  * @route GET /api/profile/discover
- * @query search, category, role, minPrice, maxPrice, location, sortBy, page, limit
  */
-const discoverProfiles = async (req, res, next) => {
+const discoverProfiles = async (req, res) => {
   try {
-    console.log("[B2B DISCOVER] Query parameters:", req.query);
+    console.log("🔥 DISCOVER HIT");
+    console.log("req.user:", req.user);
 
-    const { data: users, error } = await supabase
+    const { data, error } = await supabase
       .from('users')
-      .select('id, shop_name, role, city, state')
-      .in('role', ['wholesaler', 'distributor', 'producer']);
+      .select('id, shop_name, role, city, state');
 
     if (error) {
-      console.error("[B2B DISCOVER] Query failed:", error);
-      return res.status(500).json({ message: 'DB query failed', error });
+      console.error("DISCOVER ERROR:", error);
+      return res.status(500).json({ error: error.message });
     }
 
-    console.log(`[B2B DISCOVER] Users fetched: ${users?.length || 0}`);
+    console.log("🔥 DISCOVER data:", data);
 
-    const profiles = (users || []).filter(u => u.id !== req.user.id);
-
-    console.log(`[B2B DISCOVER] Returning ${profiles.length} profiles`);
-
-    return res.json({ profiles });
-  } catch (error) {
-    next(error);
+    res.json({ profiles: data || [] });
+  } catch (err) {
+    console.error("DISCOVER ERROR:", err);
+    res.status(500).json({ error: err.message });
   }
 };
 
@@ -156,7 +152,9 @@ const getRecommended = async (req, res, next) => {
         id, email, shop_name, role, latitude, longitude, address, city, state, is_profile_complete, created_at,
         wholesaler_products:wholesaler_products(*)
       `)
-      .in('role', ['wholesaler', 'distributor', 'producer']);
+      .in('role', ['wholesaler', 'distributor', 'producer'])
+      .not('shop_name', 'is', null)
+      .eq('is_deleted', false);
 
     const { data: users, error } = await query;
     if (error) throw error;

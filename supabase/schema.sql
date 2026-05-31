@@ -355,7 +355,12 @@ ALTER TABLE messages           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inquiries          ENABLE ROW LEVEL SECURITY;
 
 -- Service role bypasses all policies — no additional policies needed for backend.
--- If you add a frontend Supabase client, add user-scoped policies here.
+-- Public read policy for authenticated user access to supplier directory
+DROP POLICY IF EXISTS "Allow read users" ON users;
+CREATE POLICY "Allow read users" ON users FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow read wholesaler_products" ON wholesaler_products;
+CREATE POLICY "Allow read wholesaler_products" ON wholesaler_products FOR SELECT USING (true);
 
 -- ── DEFAULT CATEGORIES SEED ───────────────────────────────────────────────────
 -- Run after schema creation. user_id is NULL for defaults.

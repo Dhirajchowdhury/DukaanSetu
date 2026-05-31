@@ -642,8 +642,17 @@ const ConnectFeature = () => {
           maxDistance: dMaxDistance
         }
       });
-      setProfiles(data.profiles || []);
-      setDPages(data.pagination?.pages || 1);
+
+      console.log("[DISCOVER] API response:", data);
+      console.log("[DISCOVER] Fetched suppliers:", data?.profiles);
+      console.log("[DISCOVER] Supplier count:", data?.profiles?.length || 0);
+      if (data?.profiles?.length > 0) {
+        console.log("[DISCOVER] First supplier:", data.profiles[0]);
+      }
+
+      const suppliers = data?.profiles || [];
+      setProfiles(suppliers);
+      setDPages(1); // no server-side pagination for discover
     } catch (error) {
       console.error("DISCOVER API ERROR:", {
         url: error.config?.url,
