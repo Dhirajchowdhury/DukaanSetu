@@ -19,7 +19,20 @@ import Settings from './pages/Settings';
 import Connect from './pages/Connect';
 import Connections from './pages/Connections';
 import Orders from './pages/Orders';
+import BulkOrderPage from './pages/BulkOrderPage';
+import ReorderPage   from './pages/ReorderPage';
 import Onboarding from './pages/Onboarding';
+import ActivityLogPage from './pages/ActivityLogPage';
+import StockHistoryPage from './pages/StockHistoryPage';
+import ProductRankingPage from './pages/ProductRankingPage';
+import PendingDuesPage from './pages/PendingDuesPage';
+import BuyerProfilePage from './pages/BuyerProfilePage';
+import ExpensesPage from './pages/ExpensesPage';
+import FinancePage from './pages/FinancePage';
+import CustomersPage from './pages/CustomersPage';
+import SubscriptionsPage from './pages/SubscriptionsPage';
+import FeedbackPage from './pages/FeedbackPage';
+import DiscountsPage from './pages/DiscountsPage';
 
 // Role dashboards
 import ShopOwnerDashboard from './pages/dashboards/ShopOwnerDashboard';
@@ -30,6 +43,8 @@ import { InventoryLayout } from './features/inventory/components/InventoryLayout
 
 // Legacy /dashboard → redirect to role-specific path
 import { useAuth, getDashboardPath } from './context/AuthContext';
+import './i18n';
+import useOnlineSync from './hooks/useOnlineSync';
 
 /** Redirects /dashboard → /dashboard/<role> */
 const DashboardRedirect = () => {
@@ -38,6 +53,11 @@ const DashboardRedirect = () => {
   if (!user) return <Navigate to="/login" replace />;
   return <Navigate to={getDashboardPath(user)} replace />;
 };
+
+function AppInner() {
+  useOnlineSync();
+  return null;
+}
 
 function App() {
   return (
@@ -62,6 +82,7 @@ function App() {
             }}
           />
 
+          <AppInner />
           <Routes>
             {/* Public */}
             <Route path="/" element={<Landing />} />
@@ -135,11 +156,52 @@ function App() {
             <Route path="/connections" element={
               <PrivateRoute><Connections /></PrivateRoute>
             } />
+            <Route path="/orders/new" element={
+              <PrivateRoute><BulkOrderPage /></PrivateRoute>
+            } />
+            <Route path="/reorder-rules" element={
+              <PrivateRoute><ReorderPage /></PrivateRoute>
+            } />
             <Route path="/orders" element={
               <PrivateRoute><Orders /></PrivateRoute>
             } />
             <Route path="/onboarding" element={
               <PrivateRoute><Onboarding /></PrivateRoute>
+            } />
+
+            {/* New feature pages */}
+            <Route path="/activity" element={
+              <PrivateRoute><ActivityLogPage /></PrivateRoute>
+            } />
+            <Route path="/inventory/history" element={
+              <PrivateRoute><StockHistoryPage /></PrivateRoute>
+            } />
+            <Route path="/product-ranking" element={
+              <PrivateRoute><ProductRankingPage /></PrivateRoute>
+            } />
+            <Route path="/dues" element={
+              <PrivateRoute><PendingDuesPage /></PrivateRoute>
+            } />
+            <Route path="/buyer/:id" element={
+              <PrivateRoute><BuyerProfilePage /></PrivateRoute>
+            } />
+            <Route path="/expenses" element={
+              <PrivateRoute><ExpensesPage /></PrivateRoute>
+            } />
+            <Route path="/finance" element={
+              <PrivateRoute><FinancePage /></PrivateRoute>
+            } />
+            <Route path="/customers" element={
+              <PrivateRoute><CustomersPage /></PrivateRoute>
+            } />
+            <Route path="/subscriptions" element={
+              <PrivateRoute><SubscriptionsPage /></PrivateRoute>
+            } />
+            <Route path="/feedback" element={
+              <PrivateRoute><FeedbackPage /></PrivateRoute>
+            } />
+            <Route path="/discounts" element={
+              <PrivateRoute><DiscountsPage /></PrivateRoute>
             } />
 
             {/* Catch-all */}

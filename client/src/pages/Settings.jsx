@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { FiUser, FiLock, FiBell, FiSave } from 'react-icons/fi';
+import { useState, useEffect } from 'react';
+import { FiUser, FiLock, FiBell, FiSave, FiMoon, FiSun, FiDownload } from 'react-icons/fi';
 import Sidebar from '../components/layout/Sidebar';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -15,6 +15,12 @@ const ROLE_LABELS = {
 const Settings = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
+  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark');
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+  }, [dark]);
 
   // Profile form
   const [profile, setProfile] = useState({
@@ -93,6 +99,8 @@ const Settings = () => {
     { id: 'profile',       icon: <FiUser />,  label: 'Profile' },
     { id: 'security',      icon: <FiLock />,  label: 'Security' },
     { id: 'notifications', icon: <FiBell />,  label: 'Notifications' },
+    { id: 'appearance',    icon: <FiMoon />,  label: 'Appearance' },
+    { id: 'backup',        icon: <FiDownload />, label: 'Backup' },
   ];
 
   return (
@@ -267,6 +275,54 @@ const Settings = () => {
                   {notifLoading ? <><span className="spinner" /> Saving...</> : <><FiSave /> Save Preferences</>}
                 </button>
               </form>
+            )}
+
+            {/* Backup */}
+            {activeTab === 'backup' && (
+              <div>
+                <h2 className="settings-section-title">Data Backup</h2>
+                <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+                  Create a backup of your important data (products, orders, customers, expenses, activity logs).
+                </p>
+                <button
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    try {
+                      const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                      const res = await fetch(`${API}/backup`, { method: 'POST', credentials: 'include' });
+                      if (!res.ok) throw new Error('Backup failed');
+                      const data = await res.json();
+                      toast.success(`Backup created: ${data.filename}`);
+                    } catch (err) {
+                      toast.error(err.message);
+                    }
+                  }}
+                >
+                  <FiDownload /> Create Backup
+                </button>
+              </div>
+            )}
+
+            {/* Appearance */}
+            {activeTab === 'appearance' && (
+              <div>
+                <h2 className="settings-section-title">Appearance</h2>
+                <div className="settings-toggle-list">
+                  <div className="settings-toggle-row">
+                    <div>
+                      <p className="settings-toggle-label">Dark Mode</p>
+                      <p className="settings-toggle-sub">Switch between light and dark theme</p>
+                    </div>
+                    <button
+                      className={`btn ${dark ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                      onClick={() => setDark(d => !d)}
+                      style={{ gap: 6 }}
+                    >
+                      {dark ? <><FiSun /> Light Mode</> : <><FiMoon /> Dark Mode</>}
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         </div>

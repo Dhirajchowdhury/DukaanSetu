@@ -10,10 +10,11 @@ const getWholesalerProducts = async (req, res, next) => {
     const {
       search,
       category,
+      wholesalerId,            // NEW: filter by specific supplier
       sortBy  = 'price_per_unit',
       order   = 'asc',
       page    = 1,
-      limit   = 20,
+      limit   = wholesalerId ? 100 : 20,  // fetch all when loading for a specific supplier
     } = req.query;
 
     const ascending = order !== 'desc';
@@ -31,6 +32,9 @@ const getWholesalerProducts = async (req, res, next) => {
       .order(col, { ascending })
       .range(from, to);
 
+    if (wholesalerId) {
+      query = query.eq('wholesaler_id', wholesalerId);
+    }
     if (search) {
       query = query.ilike('product_name', `%${search}%`);
     }

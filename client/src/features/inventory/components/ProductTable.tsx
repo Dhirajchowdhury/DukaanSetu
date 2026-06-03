@@ -123,6 +123,12 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                 </th>
                 <th 
                   scope="col" 
+                  className="px-4 py-3 text-left font-bold"
+                >
+                  MARGIN
+                </th>
+                <th 
+                  scope="col" 
                   className="px-4 py-3 text-left font-bold cursor-pointer hover:text-indigo-600 transition-colors select-none" 
                   onClick={() => handleSort('status')}
                 >
@@ -168,6 +174,13 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-gray-900 font-semibold">
                       ₹{product.price.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {product.costPrice ? (() => {
+                        const margin = ((product.price - product.costPrice) / product.price) * 100;
+                        const color = margin > 20 ? 'text-green-600' : margin > 10 ? 'text-amber-600' : 'text-red-600';
+                        return <span className={`font-semibold ${color}`}>{margin.toFixed(1)}%</span>;
+                      })() : <span className="text-gray-400">—</span>}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {getStatusBadge(product.status)}

@@ -2,6 +2,7 @@ import React from 'react';
 import { FiSearch, FiPlus, FiTag } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { InventoryFilterState } from '../types';
+import VoiceSearch from '../../../components/VoiceSearch';
 
 interface InventoryHeaderProps {
   filters: InventoryFilterState;
@@ -25,15 +26,18 @@ export const InventoryHeader: React.FC<InventoryHeaderProps> = ({
 
       <div className="flex items-center gap-3 sm:gap-4 flex-wrap w-full sm:w-auto justify-start sm:justify-end">
         {/* Prominent Search Bar */}
-        <div className="relative flex-1 sm:flex-initial min-w-[200px] sm:w-72">
-          <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <input
-            type="text"
-            className="w-full border border-gray-200 rounded-lg pl-10 pr-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm placeholder-gray-400 transition bg-white shadow-sm"
-            placeholder="Search products or SKU..."
-            value={filters.searchQuery}
-            onChange={(e) => updateFilter('searchQuery', e.target.value)}
-          />
+        <div className="relative flex-1 sm:flex-initial min-w-[200px] sm:w-72 flex items-center gap-2">
+          <div className="relative flex-1">
+            <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              className="w-full border border-gray-200 rounded-lg pl-10 pr-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm placeholder-gray-400 transition bg-white shadow-sm"
+              placeholder="Search products or SKU..."
+              value={filters.searchQuery}
+              onChange={(e) => updateFilter('searchQuery', e.target.value)}
+            />
+          </div>
+          <VoiceSearch onResult={(text) => updateFilter('searchQuery', text)} />
         </div>
 
         {/* Add Category */}

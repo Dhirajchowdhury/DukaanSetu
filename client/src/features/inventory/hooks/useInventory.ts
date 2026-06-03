@@ -4,6 +4,7 @@ import api from '../../../services/api';
 import { Product, InventoryFilterState, ProductStatus } from '../types';
 import { useDebounce } from './useDebounce';
 import toast from 'react-hot-toast';
+import { connectSocket, onStockUpdated } from '../../../services/socket';
 
 export function useInventory() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -13,6 +14,7 @@ export function useInventory() {
   const [page, setPage] = useState(1);
   const itemsPerPage = 20;
 
+  const [sellFirst, setSellFirst] = useState(false);
   const [filters, setFilters] = useState<InventoryFilterState>({
     searchQuery: '',
     categoryId: null,
@@ -37,6 +39,7 @@ export function useInventory() {
       if (filters.categoryId) params.category = filters.categoryId;
       if (filters.status === 'Low Stock') params.stockLevel = 'low';
       if (filters.status === 'Out of Stock') params.stockLevel = 'out';
+      if (sellFirst) params.sellFirst = 'true';
 
       const { data } = await api.get('/products', { params });
       
@@ -125,6 +128,29 @@ export function useInventory() {
     }
   };
 
+  // Real-time stock updates
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      try { connectSocket(token); } catch {}
+    }
+    const unsub = onStockUpdated(({ productId, newStock }) => {
+      setProducts(prev => prev.map(p =>
+        p.id === productId ? { ...p, quantity: newStock } : p
+      ));
+    });
+    return unsub;
+  }, []);
+
+  const averageMargin = products.length > 0
+    ? products.reduce((sum, p) => {
+        if (p.costPrice && p.price) {
+          return sum + ((p.price - p.costPrice) / p.price) * 100;
+        }
+        return sum;
+      }, 0) / products.length
+    : 0;
+
   return {
     products,
     loading,
@@ -137,6 +163,9 @@ export function useInventory() {
     addProduct,
     editProduct,
     deleteProduct,
+    sellFirst,
+    setSellFirst,
+    averageMargin,
     refresh: fetchProducts,
   };
 }

@@ -1,0 +1,39 @@
+{
+  "app": { "name": "DukaanSetu" },
+  "nav": {
+    "dashboard": "Dashboard",
+    "inventory": "Inventory",
+    "stockHistory": "Stock History",
+    "connect": "Connect",
+    "orders": "Orders",
+    "autoReorder": "Auto-Reorder",
+    "categories": "Categories",
+    "productRanking": "Product Ranking",
+    "pendingDues": "Pending Dues",
+    "expenses": "Expenses",
+    "finance": "Finance",
+    "activityLog": "Activity Log",
+    "reports": "Reports",
+    "customers": "Customers",
+    "subscriptions": "Subscriptions",
+    "feedback": "Feedback",
+    "discounts": "Discounts",
+    "settings": "Settings",
+    "darkMode": "Dark Mode",
+    "logout": "Logout"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "noData": "No data available",
+    "confirm": "Are you sure?",
+    "success": "Success",
+    "backup": "Backup Data",
+    "voiceSearch": "Voice Search"
+  }
+}

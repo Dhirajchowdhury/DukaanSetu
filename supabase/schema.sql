@@ -494,3 +494,166 @@ EXCEPTION
     RETURN jsonb_build_object('success', false, 'message', SQLERRM);
 END;
 $$;
+
+
+CREATE OR REPLACE FUNCTION place_bulk_order_tx(
+  p_buyer_id UUID,
+  p_seller_id UUID,
+  p_items JSONB, -- Array of { productId, quantity }
+  p_delivery_location TEXT,
+  p_notes TEXT
+) RETURNS JSONB LANGUAGE plpgsql AS $$
+DECLARE
+  v_order_id UUID;
+  v_item RECORD;
+  v_product_id UUID;
+  v_quantity INTEGER;
+  v_price NUMERIC;
+  v_moq INTEGER;
+  v_stock INTEGER;
+  v_product_name TEXT;
+  v_wholesaler_id UUID;
+  v_total_price NUMERIC := 0;
+  v_subtotal NUMERIC;
+  v_items_inserted INTEGER := 0;
+BEGIN
+  -- 1. Verify connection is accepted between buyer and seller
+  IF NOT EXISTS (
+    SELECT 1 FROM connections
+    WHERE ((user_id = p_buyer_id AND connected_user_id = p_seller_id)
+       OR (user_id = p_seller_id AND connected_user_id = p_buyer_id))
+      AND status = 'accepted'
+  ) THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Must have an accepted connection to place an order');
+  END IF;
+
+  -- 2. Create the orders record (seller_id, buyer_id, status = 'pending')
+  INSERT INTO orders (buyer_id, seller_id, delivery_location, notes, status, total_price)
+  VALUES (p_buyer_id, p_seller_id, p_delivery_location, p_notes, 'pending', 0.01) -- dummy total, will update later
+  RETURNING id INTO v_order_id;
+
+  -- 3. Loop through each item in the JSONB array
+  FOR v_item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(productId UUID, quantity INTEGER) LOOP
+    v_product_id := v_item.productId;
+    v_quantity := v_item.quantity;
+
+    -- Lock the wholesaler_products row for update to prevent race conditions and fetch info
+    SELECT price_per_unit, moq, stock_available, product_name, wholesaler_id
+    INTO v_price, v_moq, v_stock, v_product_name, v_wholesaler_id
+    FROM wholesaler_products
+    WHERE id = v_product_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Product with ID % not found', v_product_id;
+    END IF;
+
+    -- Validate product belongs to the seller
+    IF v_wholesaler_id <> p_seller_id THEN
+      RAISE EXCEPTION 'Product % does not belong to the selected supplier', v_product_name;
+    END IF;
+
+    -- Validate MOQ
+    IF v_quantity < v_moq THEN
+      RAISE EXCEPTION 'Product % has a minimum order quantity of %', v_product_name, v_moq;
+    END IF;
+
+    -- Validate stock
+    IF v_quantity > v_stock THEN
+      RAISE EXCEPTION 'Product % has insufficient stock. Available: %, Ordered: %', v_product_name, v_stock, v_quantity;
+    END IF;
+
+    v_subtotal := v_price * v_quantity;
+    v_total_price := v_total_price + v_subtotal;
+
+    -- Insert into order_items
+    INSERT INTO order_items (order_id, product_id, quantity, price)
+    VALUES (v_order_id, v_product_id, v_quantity, v_price);
+
+    -- Deduct stock
+    UPDATE wholesaler_products
+    SET stock_available = stock_available - v_quantity
+    WHERE id = v_product_id;
+
+    v_items_inserted := v_items_inserted + 1;
+  END LOOP;
+
+  -- 4. Update the total_price in the orders record
+  UPDATE orders
+  SET total_price = v_total_price
+  WHERE id = v_order_id;
+
+  -- Return success
+  RETURN jsonb_build_object(
+    'success', true,
+    'order_id', v_order_id,
+    'total_price', v_total_price,
+    'message', 'Bulk order placed successfully'
+  );
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Transaction is automatically rolled back on exception
+    RETURN jsonb_build_object('success', false, 'message', SQLERRM);
+END;
+$$;
+
+-- ── REORDER RULES ─────────────────────────────────────────────────────────────
+-- Each retailer configures per-product auto-reorder triggers.
+
+CREATE TABLE IF NOT EXISTS reorder_rules (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  product_id        UUID        NOT NULL REFERENCES wholesaler_products(id) ON DELETE CASCADE,
+  supplier_id       UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  trigger_qty       INT         NOT NULL DEFAULT 10 CHECK (trigger_qty >= 0),
+  reorder_qty       INT         NOT NULL DEFAULT 50 CHECK (reorder_qty >= 1),
+  is_active         BOOLEAN     NOT NULL DEFAULT TRUE,
+  last_triggered_at TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, product_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rr_user_id    ON reorder_rules (user_id);
+CREATE INDEX IF NOT EXISTS idx_rr_product_id ON reorder_rules (product_id);
+CREATE INDEX IF NOT EXISTS idx_rr_active     ON reorder_rules (is_active) WHERE is_active = TRUE;
+
+ALTER TABLE reorder_rules ENABLE ROW LEVEL SECURITY;
+
+DROP TRIGGER IF EXISTS trg_rr_updated_at ON reorder_rules;
+CREATE TRIGGER trg_rr_updated_at
+BEFORE UPDATE ON reorder_rules
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ── DRAFT ORDERS ──────────────────────────────────────────────────────────────
+-- Auto-created by the cron job; awaits retailer approval before confirming.
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'draft_order_status') THEN
+    CREATE TYPE draft_order_status AS ENUM ('pending_approval', 'approved', 'rejected', 'expired');
+  END IF;
+END$$;
+
+CREATE TABLE IF NOT EXISTS draft_orders (
+  id           UUID               PRIMARY KEY DEFAULT gen_random_uuid(),
+  rule_id      UUID               NOT NULL REFERENCES reorder_rules(id) ON DELETE CASCADE,
+  buyer_id     UUID               NOT NULL REFERENCES users(id),
+  seller_id    UUID               NOT NULL REFERENCES users(id),
+  product_id   UUID               NOT NULL REFERENCES wholesaler_products(id),
+  quantity     INT                NOT NULL CHECK (quantity >= 1),
+  unit_price   NUMERIC(12, 2)     NOT NULL CHECK (unit_price >= 0),
+  total_price  NUMERIC(12, 2)     NOT NULL CHECK (total_price >= 0),
+  status       TEXT               NOT NULL DEFAULT 'pending_approval'
+               CHECK (status IN ('pending_approval', 'approved', 'rejected', 'expired')),
+  triggered_at TIMESTAMPTZ        NOT NULL DEFAULT NOW(),
+  resolved_at  TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ        NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_do_buyer_id  ON draft_orders (buyer_id);
+CREATE INDEX IF NOT EXISTS idx_do_rule_id   ON draft_orders (rule_id);
+CREATE INDEX IF NOT EXISTS idx_do_status    ON draft_orders (status);
+CREATE INDEX IF NOT EXISTS idx_do_created   ON draft_orders (created_at DESC);
+
+ALTER TABLE draft_orders ENABLE ROW LEVEL SECURITY;

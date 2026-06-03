@@ -59,7 +59,45 @@ const sendExpirySMS = async (phoneNumber, productName, daysLeft) => {
   }
 };
 
+const sendOrderSMS = async (phoneNumber, orderId, message) => {
+  if (!client) {
+    console.log('ℹ️  SMS service not configured. Skipping SMS notification.');
+    return;
+  }
+  try {
+    await client.messages.create({
+      body: `DukaanSetu: ${message}`,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: phoneNumber,
+    });
+    console.log(`✅ Order SMS sent to ${phoneNumber}`);
+  } catch (error) {
+    console.error('❌ SMS sending failed:', error.message);
+  }
+};
+
+const sendWhatsApp = async (to, message) => {
+  if (!client) {
+    console.log('ℹ️  SMS service not configured. Skipping WhatsApp notification.');
+    return;
+  }
+  try {
+    const whatsappFrom = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886';
+    const whatsappTo = `whatsapp:${to.replace(/^\+/, '')}`;
+    await client.messages.create({
+      body: `DukaanSetu: ${message}`,
+      from: whatsappFrom,
+      to: whatsappTo,
+    });
+    console.log(`✅ WhatsApp sent to ${to}`);
+  } catch (error) {
+    console.error('❌ WhatsApp sending failed:', error.message);
+  }
+};
+
 module.exports = {
   sendLowStockSMS,
   sendExpirySMS,
+  sendOrderSMS,
+  sendWhatsApp,
 };

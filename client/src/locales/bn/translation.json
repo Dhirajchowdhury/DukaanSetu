@@ -1,0 +1,39 @@
+{
+  "app": { "name": "দুকানসেতু" },
+  "nav": {
+    "dashboard": "ড্যাশবোর্ড",
+    "inventory": "ইনভেন্টরি",
+    "stockHistory": "স্টক ইতিহাস",
+    "connect": "কানেক্ট",
+    "orders": "অর্ডার",
+    "autoReorder": "অটো-রিঅর্ডার",
+    "categories": "ক্যাটাগরি",
+    "productRanking": "পণ্য র্যাংকিং",
+    "pendingDues": "বকেয়া",
+    "expenses": "খরচ",
+    "finance": "ফাইন্যান্স",
+    "activityLog": "অ্যাক্টিভিটি লগ",
+    "reports": "রিপোর্ট",
+    "customers": "গ্রাহক",
+    "subscriptions": "সাবস্ক্রিপশন",
+    "feedback": "মতামত",
+    "discounts": "ডিসকাউন্ট",
+    "settings": "সেটিংস",
+    "darkMode": "ডার্ক মোড",
+    "logout": "লগ আউট"
+  },
+  "common": {
+    "loading": "লোড হচ্ছে...",
+    "error": "কিছু ভুল হয়েছে",
+    "save": "সংরক্ষণ",
+    "cancel": "বাতিল",
+    "delete": "মুছুন",
+    "edit": "সম্পাদনা",
+    "search": "অনুসন্ধান",
+    "noData": "কোনো তথ্য নেই",
+    "confirm": "আপনি কি নিশ্চিত?",
+    "success": "সফল",
+    "backup": "ব্যাকআপ ডেটা",
+    "voiceSearch": "ভয়েস অনুসন্ধান"
+  }
+}

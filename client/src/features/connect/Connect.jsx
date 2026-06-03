@@ -9,7 +9,7 @@ import {
 import { 
   FiSearch, FiMapPin, FiPackage, FiShoppingCart, FiMessageSquare, 
   FiCompass, FiNavigation, FiMap, FiUser, FiSend, FiX, 
-  FiChevronRight, FiInfo, FiArrowLeft, FiClock, FiMaximize, FiCheck
+  FiChevronRight, FiInfo, FiArrowLeft, FiClock, FiMaximize, FiCheck, FiCpu
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import './Connect.css';
@@ -333,6 +333,11 @@ const ConnectFeature = () => {
   // Connect Loading state
   const [connectingUsers, setConnectingUsers] = useState({});
 
+  // AI Supplier Recommendation
+  const [aiCategory, setAiCategory] = useState('');
+  const [aiRecLoading, setAiRecLoading] = useState(false);
+  const [aiRecommendation, setAiRecommendation] = useState(null);
+
   // Inquiry Modal states
   const [showInquiryModal, setShowInquiryModal] = useState(false);
   const [selectedInquiryProduct, setSelectedInquiryProduct] = useState(null);
@@ -343,6 +348,7 @@ const ConnectFeature = () => {
   // Order Modal states
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedOrderProduct, setSelectedOrderProduct] = useState(null);
+  const [orderItems, setOrderItems] = useState([]);
   const [orderQty, setOrderQty] = useState(1);
   const [orderDeliveryLocation, setOrderDeliveryLocation] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
@@ -633,7 +639,28 @@ const ConnectFeature = () => {
   const triggerOrderModal = (e, product) => {
     if (e) e.stopPropagation();
     setSelectedOrderProduct(product);
-    setOrderQty(product.moq || 1);
+    setOrderItems([
+      {
+        id: Math.random().toString(36).substring(7),
+        productId: product.id,
+        quantity: product.moq || 1
+      }
+    ]);
+    setOrderDeliveryLocation(user?.address || '');
+    setOrderNotes('');
+    setShowOrderModal(true);
+  };
+
+  const triggerBulkOrderModal = () => {
+    if (!listings || listings.length === 0) return;
+    setSelectedOrderProduct(listings[0]);
+    setOrderItems([
+      {
+        id: Math.random().toString(36).substring(7),
+        productId: listings[0].id,
+        quantity: listings[0].moq || 1
+      }
+    ]);
     setOrderDeliveryLocation(user?.address || '');
     setOrderNotes('');
     setShowOrderModal(true);
@@ -641,32 +668,49 @@ const ConnectFeature = () => {
 
   const handlePlaceOrderSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedOrderProduct) return;
+    if (!orderItems.length || !sellerProfile) return;
 
-    if (selectedOrderProduct.moq && orderQty < selectedOrderProduct.moq) {
-      toast.error(`Minimum order quantity not met. MOQ is ${selectedOrderProduct.moq}`);
-      return;
-    }
-
-    if (orderQty > selectedOrderProduct.stock_available) {
-      toast.error(`Order quantity exceeds available stock of ${selectedOrderProduct.stock_available}`);
-      return;
+    // Validate each item locally first
+    for (let i = 0; i < orderItems.length; i++) {
+      const item = orderItems[i];
+      const prod = listings.find(p => p.id === item.productId);
+      if (!prod) {
+        toast.error(`Item ${i + 1} has an invalid product selected.`);
+        return;
+      }
+      
+      const qty = parseInt(item.quantity) || 0;
+      if (qty <= 0) {
+        toast.error(`Please enter a valid quantity for ${prod.product_name}`);
+        return;
+      }
+      if (prod.moq && qty < prod.moq) {
+        toast.error(`MOQ of ${prod.moq} not met for ${prod.product_name}`);
+        return;
+      }
+      if (qty > prod.stock_available) {
+        toast.error(`Quantity ${qty} exceeds available stock (${prod.stock_available}) for ${prod.product_name}`);
+        return;
+      }
     }
 
     setPlacingOrder(true);
-    const loadingToastId = toast.loading('Placing order...');
+    const loadingToastId = toast.loading('Placing bulk order...');
     try {
-      await api.post('/orders', {
-        productId: selectedOrderProduct.id,
-        quantity: parseInt(orderQty),
+      await api.post('/orders/bulk', {
+        supplierId: sellerProfile.id,
+        items: orderItems.map(item => ({
+          productId: item.productId,
+          quantity: parseInt(item.quantity)
+        })),
         deliveryLocation: orderDeliveryLocation,
         notes: orderNotes
       });
-      toast.success('Order placed successfully!', { id: loadingToastId });
+      toast.success('Bulk order placed successfully!', { id: loadingToastId });
       setShowOrderModal(false);
     } catch (error) {
       console.error(error);
-      toast.error(error.response?.data?.message || 'Failed to place order', { id: loadingToastId });
+      toast.error(error.response?.data?.message || 'Failed to place bulk order', { id: loadingToastId });
     } finally {
       setPlacingOrder(false);
     }
@@ -1211,9 +1255,20 @@ const ConnectFeature = () => {
         </div>
 
         {/* Products by this user */}
-        <h3 className="profile-details__subtitle">
-          <FiPackage className="text-primary" /> Available Products ({listings.length})
-        </h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+          <h3 className="profile-details__subtitle" style={{ margin: 0 }}>
+            <FiPackage className="text-primary" /> Available Products ({listings.length})
+          </h3>
+          {sellerProfile?.connectionStatus === 'accepted' && listings.length > 1 && (
+            <button
+              onClick={triggerBulkOrderModal}
+              className="btn btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13 }}
+            >
+              🛒 Place Bulk Order
+            </button>
+          )}
+        </div>
 
         {listings.length === 0 ? (
           <div className="card empty-state">
@@ -1333,7 +1388,7 @@ const ConnectFeature = () => {
                     </div>
                   </div>
 
-                  {product.expiry_date && (
+                      {product.expiry_date && (
                     <div className="inventory-card__footer">
                       <span className={`inventory-card__expiry ${isExpiringAlert ? 'inventory-card__expiry--alert' : ''}`}>
                         {isExpiringAlert ? '🕒 Near Expiry' : '📅 Expiry Date'}
@@ -1346,6 +1401,117 @@ const ConnectFeature = () => {
             })}
           </div>
         )}
+
+        {/* Supplier Ratings Section */}
+        {sellerProfile?.id && (() => {
+          const [ratings, setRatings] = React.useState([]);
+          const [avgRating, setAvgRating] = React.useState(0);
+          const [totalReviews, setTotalReviews] = React.useState(0);
+          const [userRating, setUserRating] = React.useState(0);
+          const [reviewText, setReviewText] = React.useState('');
+          const [submitting, setSubmitting] = React.useState(false);
+          const [loadingRatings, setLoadingRatings] = React.useState(true);
+
+          React.useEffect(() => {
+            fetchRatings();
+          }, [sellerProfile.id]);
+
+          const fetchRatings = async () => {
+            setLoadingRatings(true);
+            try {
+              const api = (await import('../../services/api')).default;
+              const { data } = await api.get(`/suppliers/${sellerProfile.id}/ratings`);
+              setRatings(data.ratings || []);
+              setAvgRating(data.averageRating || 0);
+              setTotalReviews(data.totalReviews || 0);
+            } catch {} finally {
+              setLoadingRatings(false);
+            }
+          };
+
+          const handleSubmitRating = async () => {
+            if (userRating < 1) return;
+            setSubmitting(true);
+            try {
+              const api = (await import('../../services/api')).default;
+              await api.post(`/suppliers/${sellerProfile.id}/rate`, { rating: userRating, reviewText });
+              toast.success('Rating submitted!');
+              setUserRating(0);
+              setReviewText('');
+              fetchRatings();
+            } catch (err) {
+              toast.error(err.response?.data?.message || 'Failed to submit rating');
+            } finally {
+              setSubmitting(false);
+            }
+          };
+
+          return (
+            <div className="mt-8">
+              <h3 className="profile-details__subtitle" style={{ marginBottom: 16 }}>
+                ⭐ Ratings & Reviews ({totalReviews})
+              </h3>
+              {avgRating > 0 && (
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-2xl font-bold">{avgRating}</span>
+                  <div className="flex items-center">
+                    {[1,2,3,4,5].map(s => (
+                      <span key={s} className={`text-lg ${s <= Math.round(avgRating) ? 'text-amber-400' : 'text-gray-300'}`}>★</span>
+                    ))}
+                  </div>
+                  <span className="text-sm text-gray-500">({totalReviews} reviews)</span>
+                </div>
+              )}
+              {sellerProfile?.isConnected && (
+                <div className="card mb-4" style={{ padding: 16 }}>
+                  <p className="font-semibold text-sm mb-2">Rate this supplier</p>
+                  <div className="flex items-center gap-2 mb-2">
+                    {[1,2,3,4,5].map(s => (
+                      <button key={s} onClick={() => setUserRating(s)} className="text-xl">
+                        <span className={s <= userRating ? 'text-amber-400' : 'text-gray-300'}>★</span>
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    className="form-textarea text-sm"
+                    rows={2}
+                    placeholder="Write a review (optional)..."
+                    value={reviewText}
+                    onChange={e => setReviewText(e.target.value)}
+                  />
+                  <button
+                    className="btn btn-primary btn-sm mt-2"
+                    disabled={submitting || userRating < 1}
+                    onClick={handleSubmitRating}
+                  >
+                    {submitting ? 'Submitting...' : 'Submit Rating'}
+                  </button>
+                </div>
+              )}
+              {loadingRatings ? (
+                <p className="text-sm text-gray-500">Loading reviews...</p>
+              ) : ratings.length === 0 ? (
+                <p className="text-sm text-gray-500">No reviews yet.</p>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {ratings.slice(0, 10).map(r => (
+                    <div key={r.id} className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-sm">{r.reviewer?.shopName || 'Anonymous'}</span>
+                        <div className="flex">
+                          {[1,2,3,4,5].map(s => (
+                            <span key={s} className={`text-sm ${s <= r.rating ? 'text-amber-400' : 'text-gray-300'}`}>★</span>
+                          ))}
+                        </div>
+                      </div>
+                      {r.reviewText && <p className="text-sm text-gray-600">{r.reviewText}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     );
   }, [sellerProfile, sellerListings, sellerProducts, connectingUsers, routeSellerId]);
@@ -1590,6 +1756,71 @@ const ConnectFeature = () => {
                 🌍 All
               </button>
             </div>
+          </div>
+
+          {/* AI Supplier Recommendation */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-4">
+            <details style={{ cursor: 'pointer' }}>
+              <summary style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <FiCpu style={{ color: '#6366f1' }} /> AI Supplier Recommendation
+              </summary>
+              <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                <input
+                  type="text"
+                  placeholder="Enter product category (e.g., Rice, Electronics)..."
+                  value={aiCategory}
+                  onChange={e => setAiCategory(e.target.value)}
+                  className="form-input"
+                  style={{ flex: 1 }}
+                />
+                <button
+                  onClick={async () => {
+                    if (!aiCategory.trim()) return;
+                    setAiRecLoading(true);
+                    setAiRecommendation(null);
+                    try {
+                      const { data } = await api.get('/ai/supplier-recommendation', { params: { productCategory: aiCategory } });
+                      setAiRecommendation(data);
+                    } catch {} finally { setAiRecLoading(false); }
+                  }}
+                  disabled={aiRecLoading || !aiCategory.trim()}
+                  className="btn btn-primary btn-sm"
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  {aiRecLoading ? 'Thinking...' : 'AI Recommend'}
+                </button>
+              </div>
+              {aiRecommendation && (
+                <div style={{ marginTop: 12 }}>
+                  {aiRecommendation.recommendation ? (
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg">🤖</span>
+                        <span className="font-bold text-indigo-700 text-sm">AI Top Pick</span>
+                      </div>
+                      <p className="text-sm text-indigo-900 font-semibold">
+                        {aiRecommendation.candidates?.find(c => c.id === aiRecommendation.recommendation?.recommendedSupplierId)?.shopName || 'Supplier'}
+                      </p>
+                      <p className="text-xs text-indigo-600 mt-1">{aiRecommendation.recommendation.reason}</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400">No recommendation available. Try a different category.</p>
+                  )}
+                  {aiRecommendation.candidates?.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      <p className="text-xs font-semibold text-gray-500">Candidates considered:</p>
+                      {aiRecommendation.candidates.map(c => (
+                        <div key={c.id} className="text-xs text-gray-600 flex items-center gap-2">
+                          <span>{c.shopName}</span>
+                          <span className="text-gray-400">⭐{c.avgRating}</span>
+                          <span className="text-gray-400">₹{c.minPrice}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </details>
           </div>
 
           {/* Directory Listings */}
@@ -2033,7 +2264,7 @@ const ConnectFeature = () => {
       {/* ── Order Overlay Modal Component ── */}
       {showOrderModal && selectedOrderProduct && (
         <div className="modal-overlay">
-          <div className="modal">
+          <div className="modal" style={{ maxWidth: '650px', width: '90%' }}>
             <div className="modal-header">
               <h2>🛒 Place B2B Order</h2>
               <button className="btn-ghost" onClick={() => setShowOrderModal(false)}>
@@ -2041,7 +2272,7 @@ const ConnectFeature = () => {
               </button>
             </div>
             <form onSubmit={handlePlaceOrderSubmit}>
-              <div className="modal-body">
+              <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                 {!selectedOrderProduct.price_per_unit || parseFloat(selectedOrderProduct.price_per_unit) <= 0 ? (
                   <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: 18, borderRadius: 12, marginBottom: 10, textAlign: 'center' }}>
                     <span style={{ fontSize: '32px', display: 'block', marginBottom: '8px' }}>🔒</span>
@@ -2054,30 +2285,104 @@ const ConnectFeature = () => {
                   </div>
                 ) : (
                   <div>
-                    <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary-muted)', padding: 16, borderRadius: 12, marginBottom: 20 }}>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{selectedOrderProduct.product_name}</h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13, color: 'var(--text-secondary)' }}>
-                        <div>💰 Unit Price: <strong>₹{selectedOrderProduct.price_per_unit}</strong></div>
-                        <div>📦 Available Stock: <strong>{selectedOrderProduct.stock_available} {selectedOrderProduct.unit || 'units'}</strong></div>
-                        {selectedOrderProduct.moq > 0 && (
-                          <div style={{ gridColumn: 'span 2' }}>
-                            ⚠️ Minimum Order Quantity (MOQ): <strong>{selectedOrderProduct.moq} {selectedOrderProduct.unit || 'units'}</strong>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    {/* Itemized list of products in the order */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
+                      <label className="form-label" style={{ fontWeight: 800, borderBottom: '2px solid var(--border)', paddingBottom: 6 }}>
+                        Items in Order
+                      </label>
+                      {orderItems.map((item, idx) => {
+                        const prod = listings.find(p => p.id === item.productId);
+                        if (!prod) return null;
+                        return (
+                          <div key={item.id} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', padding: 16, borderRadius: 12, position: 'relative' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                              <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-secondary)' }}>
+                                Product #{idx + 1}
+                              </span>
+                              {orderItems.length > 1 && (
+                                <button
+                                  type="button"
+                                  style={{ background: 'transparent', color: 'var(--danger)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                                  onClick={() => setOrderItems(orderItems.filter(oi => oi.id !== item.id))}
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                            
+                            <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr', gap: 12, marginBottom: 10 }}>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label" style={{ fontSize: 12 }}>Product</label>
+                                <select
+                                  className="form-input"
+                                  value={item.productId}
+                                  onChange={(e) => {
+                                    const prodId = e.target.value;
+                                    const p = listings.find(x => x.id === prodId);
+                                    setOrderItems(orderItems.map(oi => oi.id === item.id ? { ...oi, productId: prodId, quantity: p?.moq || 1 } : oi));
+                                  }}
+                                >
+                                  {listings.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.product_name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label" style={{ fontSize: 12 }}>Quantity</label>
+                                <input
+                                  type="number"
+                                  className="form-input"
+                                  min={prod.moq || 1}
+                                  max={prod.stock_available}
+                                  required
+                                  value={item.quantity}
+                                  onChange={(e) => {
+                                    const qty = parseInt(e.target.value) || '';
+                                    setOrderItems(orderItems.map(oi => oi.id === item.id ? { ...oi, quantity: qty } : oi));
+                                  }}
+                                />
+                              </div>
+                            </div>
 
-                    <div className="form-group">
-                      <label className="form-label">Quantity</label>
-                      <input 
-                        type="number" 
-                        min={selectedOrderProduct.moq || 1}
-                        max={selectedOrderProduct.stock_available}
-                        required 
-                        className="form-input" 
-                        value={orderQty}
-                        onChange={(e) => setOrderQty(parseInt(e.target.value) || '')}
-                      />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+                              <div>
+                                <span>Unit: ₹{parseFloat(prod.price_per_unit || 0).toFixed(2)}</span>
+                                <span style={{ margin: '0 8px' }}>|</span>
+                                <span>Stock: {prod.stock_available}</span>
+                                {prod.moq > 0 && (
+                                  <>
+                                    <span style={{ margin: '0 8px' }}>|</span>
+                                    <span>MOQ: {prod.moq}</span>
+                                  </>
+                                )}
+                              </div>
+                              <span style={{ fontWeight: 700, color: 'var(--text)' }}>
+                                Subtotal: ₹{((parseInt(item.quantity) || 0) * (prod.price_per_unit || 0)).toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {orderItems.length < listings.length && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary w-full"
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 16px', fontSize: 13, borderStyle: 'dashed' }}
+                          onClick={() => {
+                            const unusedProduct = listings.find(p => !orderItems.some(oi => oi.productId === p.id)) || listings[0];
+                            setOrderItems([...orderItems, {
+                              id: Math.random().toString(36).substring(7),
+                              productId: unusedProduct.id,
+                              quantity: unusedProduct.moq || 1
+                            }]);
+                          }}
+                        >
+                          ➕ Add Another Product
+                        </button>
+                      )}
                     </div>
 
                     <div className="form-group">
@@ -2103,11 +2408,14 @@ const ConnectFeature = () => {
                       />
                     </div>
 
-                    {/* live computation */}
-                    <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Total Price:</span>
-                      <span style={{ fontSize: 24, fontWeight: 900, color: 'var(--primary)' }}>
-                        ₹{((parseInt(orderQty) || 0) * (selectedOrderProduct.price_per_unit || 0)).toFixed(2)}
+                    {/* live grand total computation */}
+                    <div style={{ marginTop: 24, paddingTop: 16, borderTop: '2px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)' }}>Grand Total:</span>
+                      <span style={{ fontSize: 28, fontWeight: 900, color: 'var(--primary)' }}>
+                        ₹{orderItems.reduce((sum, item) => {
+                          const prod = listings.find(p => p.id === item.productId);
+                          return sum + (parseInt(item.quantity) || 0) * parseFloat(prod?.price_per_unit || 0);
+                        }, 0).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -2118,9 +2426,9 @@ const ConnectFeature = () => {
                 <button 
                   type="submit" 
                   className="btn btn-primary" 
-                  disabled={placingOrder || !orderQty || orderQty < selectedOrderProduct.moq || orderQty > selectedOrderProduct.stock_available || !selectedOrderProduct.price_per_unit || parseFloat(selectedOrderProduct.price_per_unit) <= 0}
+                  disabled={placingOrder || orderItems.length === 0 || !selectedOrderProduct.price_per_unit || parseFloat(selectedOrderProduct.price_per_unit) <= 0}
                 >
-                  {placingOrder ? 'Placing Order...' : 'Place Order'}
+                  {placingOrder ? 'Placing Order...' : 'Place Bulk Order'}
                 </button>
               </div>
             </form>

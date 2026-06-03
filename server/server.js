@@ -10,6 +10,7 @@ const { connectDB } = require('./config/db');
 const passport = require('./config/passport');
 const errorHandler = require('./middleware/errorHandler');
 const alertScheduler = require('./cron/alertScheduler');
+const duesReminder = require('./cron/duesReminder');
 const { setupSocket } = require('./services/socket');
 
 const authRoutes = require('./routes/auth.routes');
@@ -26,6 +27,22 @@ const connectionRoutes = require('./routes/connection.routes');
 const conversationsRoutes = require('./routes/conversations.routes');
 const messagesRoutes = require('./routes/messages.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
+const reorderRoutes   = require('./routes/reorder.routes');
+const activityRoutes  = require('./routes/activity.routes');
+const scanHistoryRoutes = require('./routes/scanHistory.routes');
+const supplierRatingRoutes = require('./routes/supplierRating.routes');
+const productRankingRoutes = require('./routes/productRanking.routes');
+const duesRoutes      = require('./routes/dues.routes');
+const expenseRoutes   = require('./routes/expense.routes');
+const salesReportsRoutes = require('./routes/salesReports.routes');
+const priceCompareRoutes = require('./routes/priceCompare.routes');
+const aiRoutes = require('./routes/ai.routes');
+const financeRoutes = require('./routes/finance.routes');
+const customerRoutes = require('./routes/customer.routes');
+const subscriptionRoutes = require('./routes/subscription.routes');
+const feedbackRoutes = require('./routes/feedback.routes');
+const discountRoutes = require('./routes/discount.routes');
+const backupRoutes = require('./routes/backup.routes');
 
 const app = express();
 
@@ -78,7 +95,23 @@ app.use('/api/inquiries', inquiryRoutes);
 app.use('/api/connections', connectionRoutes);
 app.use('/api/conversations', conversationsRoutes);
 app.use('/api/messages', messagesRoutes);
-app.use('/api/analytics', analyticsRoutes);
+app.use('/api/analytics',       analyticsRoutes);
+app.use('/api/reorder-rules',   reorderRoutes);
+app.use('/api/activity',        activityRoutes);
+app.use('/api/scan-history',    scanHistoryRoutes);
+app.use('/api/suppliers',       supplierRatingRoutes);
+app.use('/api/product-ranking', productRankingRoutes);
+app.use('/api/dues',            duesRoutes);
+app.use('/api/expenses',        expenseRoutes);
+app.use('/api/reports/sales',   salesReportsRoutes);
+app.use('/api/suppliers/price-compare', priceCompareRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/finance', financeRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/feedback', feedbackRoutes);
+app.use('/api/discount-rules', discountRoutes);
+app.use('/api/backup', backupRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
@@ -101,6 +134,7 @@ app.use(errorHandler);
 
 // ── Cron jobs ─────────────────────────────────────────────────────────────────
 alertScheduler.start();
+duesReminder.start();
 
 const server = http.createServer(app);
 setupSocket(server);

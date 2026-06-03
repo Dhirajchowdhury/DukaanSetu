@@ -134,8 +134,34 @@ const sendExpiryAlert = async (email, products) => {
   }
 };
 
+const sendOrderNotification = async (email, orderId, message) => {
+  if (!transporter) {
+    console.log('ℹ️  Email service not configured. Skipping email notification.');
+    return;
+  }
+  try {
+    const mailOptions = {
+      from: `"DukaanSetu" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: `Order Update - #${orderId.slice(0, 8)}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #4f46e5;">Order Update</h2>
+          <p>${message}</p>
+          <a href="${process.env.CLIENT_URL}/orders" style="display: inline-block; background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin-top: 20px;">View Order</a>
+        </div>
+      `,
+    };
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Order notification email sent to ${email}`);
+  } catch (error) {
+    console.error('❌ Email sending failed:', error.message);
+  }
+};
+
 module.exports = {
   sendVerificationEmail,
   sendLowStockAlert,
   sendExpiryAlert,
+  sendOrderNotification,
 };

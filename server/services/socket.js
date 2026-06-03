@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { supabase } = require('../config/db');
 
+let io = null;
 const onlineUsers = new Map();            // userId → Set<socketId>
 const userMessageTimestamps = new Map();  // userId → [ms timestamps]
 
@@ -53,7 +54,7 @@ function checkRateLimit(userId) {
 function setupSocket(server) {
   const { Server } = require('socket.io');
 
-  const io = new Server(server, {
+  io = new Server(server, {
     cors: {
       origin: ['https://dukaansetu.vercel.app', 'http://localhost:5173'],
       credentials: true,
@@ -189,4 +190,8 @@ function setupSocket(server) {
   return io;
 }
 
-module.exports = { setupSocket, setupRedisAdapter, onlineUsers };
+function getIO() {
+  return io;
+}
+
+module.exports = { setupSocket, setupRedisAdapter, onlineUsers, getIO };

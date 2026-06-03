@@ -60,6 +60,7 @@ const getProducts = async (req, res, next) => {
       order      = 'desc',
       stockLevel,   // 'low' | 'out'
       expiryRange,  // 'week' | 'month'
+      sellFirst,    // 'true' — sort by expiry_date ASC for FEFO
     } = req.query;
 
     const threshold = req.user.preferences?.lowStockThreshold ?? 10;
@@ -72,9 +73,15 @@ const getProducts = async (req, res, next) => {
     let query = supabase
       .from('products')
       .select('*, categories(name, icon)', { count: 'exact' })
-      .eq('user_id', userId)
-      .order(col, { ascending })
-      .range(from, to);
+      .eq('user_id', userId);
+
+    if (sellFirst === 'true') {
+      query = query.not('expiry_date', 'is', null).order('expiry_date', { ascending: true });
+    } else {
+      query = query.order(col, { ascending });
+    }
+
+    query = query.range(from, to);
 
     // Search (product_name OR brand)
     if (search) {

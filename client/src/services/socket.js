@@ -26,6 +26,7 @@ export function connectSocket(token) {
   socket.on('connect', () => {
     console.log('[socket] Connected / Reconnected');
     reconnectHandlers.forEach(fn => fn());
+    stockUpdateHandlers.forEach(fn => socket.on('stock:updated', fn));
   });
 
   return socket;
@@ -87,3 +88,33 @@ export function offMessage() {
 export function isConnected() {
   return socket?.connected ?? false;
 }
+
+let stockUpdateHandlers = [];
+
+export function onStockUpdated(handler) {
+  stockUpdateHandlers.push(handler);
+  if (socket) {
+    socket.on('stock:updated', handler);
+  }
+  return () => {
+    stockUpdateHandlers = stockUpdateHandlers.filter(h => h !== handler);
+    if (socket) {
+      socket.off('stock:updated', handler);
+    }
+  };
+}
+
+export function onAnyEvent(event, handler) {
+  if (socket) {
+    socket.on(event, handler);
+  }
+  return () => {
+    if (socket) {
+      socket.off(event, handler);
+    }
+  };
+}
+
+// Re-register stock handlers on reconnect
+const origOnReconnect = onReconnect;
+export { origOnReconnect };

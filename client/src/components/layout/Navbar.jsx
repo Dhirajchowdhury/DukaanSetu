@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, getDashboardPath } from '../../context/AuthContext';
-import { FiMenu, FiX, FiLogOut } from 'react-icons/fi';
+import { FiMenu, FiX, FiLogOut, FiMoon, FiSun } from 'react-icons/fi';
 import './Navbar.css';
 
 const Navbar = () => {
@@ -9,6 +9,12 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark');
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+  }, [dark]);
 
   const isActive = (path) => location.pathname === path;
   const close = () => setOpen(false);
@@ -47,6 +53,9 @@ const Navbar = () => {
               <Link to="/products"   className={`navbar__link ${isActive('/products')   ? 'navbar__link--active' : ''}`}>Products</Link>
               <Link to="/categories" className={`navbar__link ${isActive('/categories') ? 'navbar__link--active' : ''}`}>Categories</Link>
               <Link to="/reports"    className={`navbar__link ${isActive('/reports')    ? 'navbar__link--active' : ''}`}>Reports</Link>
+              <button className="btn btn-ghost btn-sm" onClick={() => setDark(d => !d)} title="Toggle theme">
+                {dark ? <FiSun /> : <FiMoon />}
+              </button>
               <button className="btn btn-ghost btn-sm navbar__logout" onClick={handleLogout}>
                 <FiLogOut /> Logout
               </button>

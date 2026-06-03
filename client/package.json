@@ -15,16 +15,19 @@
     "framer-motion": "^10.18.0",
     "gsap": "^3.12.4",
     "html5-qrcode": "^2.3.8",
+    "i18next": "^26.3.1",
+    "idb": "^8.0.3",
     "react": "^18.2.0",
     "react-barcode": "^1.5.3",
     "react-barcode-reader": "^0.0.2",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
+    "react-i18next": "^17.0.8",
     "react-icons": "^5.0.1",
     "react-router-dom": "^6.20.1",
-    "zustand": "^5.0.13",
-    "socket.io-client": "^4.7.4"
+    "socket.io-client": "^4.7.4",
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.0",
