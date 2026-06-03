@@ -50,12 +50,14 @@ const app = express();
 connectDB();
 
 // ── Security & parsing middleware ─────────────────────────────────────────────
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+  contentSecurityPolicy: false,
+}));
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "https://dukaansetu.vercel.app"
-  ],
+  origin: process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',')
+    : ["http://localhost:5173", "https://dukaansetu.vercel.app"],
   credentials: true,
 }));
 app.use(express.json());
