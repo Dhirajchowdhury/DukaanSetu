@@ -68,7 +68,11 @@ const Sidebar = () => {
           const resolvedPath = item.isDashboard ? getDashboardPath(user) : item.path;
           const active = item.isDashboard
             ? location.pathname.startsWith('/dashboard')
-            : location.pathname === item.path;
+            : item.path === '/products'
+              ? (location.pathname === '/products' || location.pathname === '/inventory')
+              : item.path === '/connect'
+                ? (location.pathname.startsWith('/connect') || location.pathname.startsWith('/profile'))
+                : location.pathname === item.path;
           return (
             <Link
               key={item.label}

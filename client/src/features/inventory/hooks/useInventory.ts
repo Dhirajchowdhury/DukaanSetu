@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+// @ts-ignore
 import api from '../../../services/api';
 import { Product, InventoryFilterState, ProductStatus } from '../types';
 import { useDebounce } from './useDebounce';
@@ -51,6 +52,13 @@ export function useInventory() {
         status: p.quantity <= 0 ? 'Out of Stock' : p.isLowStock ? 'Low Stock' : 'In Stock',
         sku: p.id?.slice(-8)?.toUpperCase() || 'N/A',
         lastUpdated: p.updatedAt,
+        brand: p.brand,
+        brandName: p.brand,
+        unit: p.unit,
+        costPrice: p.costPrice,
+        batchNumber: p.batchNumber,
+        supplier: p.supplier,
+        supplierName: p.supplier,
       }));
 
       setProducts(mappedProducts);
@@ -73,9 +81,20 @@ export function useInventory() {
     setPage(1);
   }, []);
 
+  const formatPayload = (productData: any) => {
+    const payload = {
+      ...productData,
+      brand: productData.brandName,
+      supplier: productData.supplierName,
+    };
+    delete payload.brandName;
+    delete payload.supplierName;
+    return payload;
+  };
+
   const addProduct = async (productData: any) => {
     try {
-      await api.post('/products', productData);
+      await api.post('/products', formatPayload(productData));
       toast.success('Product added successfully');
       fetchProducts();
     } catch (error: any) {
@@ -97,7 +116,7 @@ export function useInventory() {
 
   const editProduct = async (id: string, productData: any) => {
     try {
-      await api.put(`/products/${id}`, productData);
+      await api.put(`/products/${id}`, formatPayload(productData));
       toast.success('Product updated successfully');
       fetchProducts();
     } catch (error) {

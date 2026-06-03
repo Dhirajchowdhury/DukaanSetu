@@ -4,28 +4,29 @@ import { AuthProvider } from './context/AuthContext';
 import { ProductProvider } from './context/ProductContext';
 
 // Auth
-import PrivateRoute  from './components/auth/PrivateRoute';
-import RoleRoute     from './components/auth/RoleRoute';
+import PrivateRoute from './components/auth/PrivateRoute';
+import RoleRoute from './components/auth/RoleRoute';
 
 // Pages
-import Landing       from './pages/Landing';
-import Login         from './pages/Login';
-import Signup        from './pages/Signup';
-import AuthCallback  from './pages/AuthCallback';
-import Products      from './pages/Products';
-import Categories    from './pages/Categories';
-import Reports       from './pages/Reports';
-import Settings      from './pages/Settings';
-import Connect       from './pages/Connect';
-import Connections   from './pages/Connections';
-import Orders        from './pages/Orders';
-import Onboarding    from './pages/Onboarding';
+import Landing from './pages/Landing';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import AuthCallback from './pages/AuthCallback';
+import Products from './pages/Products';
+import Categories from './pages/Categories';
+import Reports from './pages/Reports';
+import Settings from './pages/Settings';
+import Connect from './pages/Connect';
+import Connections from './pages/Connections';
+import Orders from './pages/Orders';
+import Onboarding from './pages/Onboarding';
 
 // Role dashboards
-import ShopOwnerDashboard   from './pages/dashboards/ShopOwnerDashboard';
+import ShopOwnerDashboard from './pages/dashboards/ShopOwnerDashboard';
 import DistributorDashboard from './pages/dashboards/DistributorDashboard';
-import WholesalerDashboard  from './pages/dashboards/WholesalerDashboard';
-import ProducerDashboard    from './pages/dashboards/ProducerDashboard';
+import WholesalerDashboard from './pages/dashboards/WholesalerDashboard';
+import ProducerDashboard from './pages/dashboards/ProducerDashboard';
+import { InventoryLayout } from './features/inventory/components/InventoryLayout';
 
 // Legacy /dashboard → redirect to role-specific path
 import { useAuth, getDashboardPath } from './context/AuthContext';
@@ -34,7 +35,7 @@ import { useAuth, getDashboardPath } from './context/AuthContext';
 const DashboardRedirect = () => {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (!user)   return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
   return <Navigate to={getDashboardPath(user)} replace />;
 };
 
@@ -57,15 +58,15 @@ function App() {
                 fontWeight: '500',
               },
               success: { iconTheme: { primary: '#22C55E', secondary: '#fff' } },
-              error:   { iconTheme: { primary: '#EF4444', secondary: '#fff' } },
+              error: { iconTheme: { primary: '#EF4444', secondary: '#fff' } },
             }}
           />
 
           <Routes>
             {/* Public */}
-            <Route path="/"             element={<Landing />} />
-            <Route path="/login"        element={<Login />} />
-            <Route path="/signup"       element={<Signup />} />
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
 
             {/* Legacy redirect */}
@@ -108,7 +109,10 @@ function App() {
 
             {/* ── Common protected pages (all roles) ── */}
             <Route path="/products" element={
-              <PrivateRoute><Products /></PrivateRoute>
+              <PrivateRoute><InventoryLayout /></PrivateRoute>
+            } />
+            <Route path="/inventory" element={
+              <PrivateRoute><InventoryLayout /></PrivateRoute>
             } />
             <Route path="/categories" element={
               <PrivateRoute><Categories /></PrivateRoute>

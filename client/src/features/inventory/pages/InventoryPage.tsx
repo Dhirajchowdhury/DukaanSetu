@@ -5,7 +5,6 @@ import { ProductTable } from '../components/ProductTable';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { DeleteConfirmationModal } from '../components/DeleteConfirmationModal';
 import { Product } from '../types';
-import '../styles/inventory.css';
 import { toast } from 'react-hot-toast';
 
 export const InventoryPage: React.FC = () => {

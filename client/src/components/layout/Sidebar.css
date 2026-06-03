@@ -52,7 +52,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 4px 6px -1px rgba(13,148,136,0.2);
+  box-shadow: 0 4px 6px -1px rgba(79,70,229,0.2);
 }
 .sidebar__user-info { min-width: 0; }
 .sidebar__user-name {
@@ -105,7 +105,7 @@
 .sidebar__item--active {
   background: var(--primary);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(13,148,136,0.25);
+  box-shadow: 0 4px 12px rgba(79,70,229,0.25);
 }
 .sidebar__item--active:hover {
   background: var(--primary-hover);

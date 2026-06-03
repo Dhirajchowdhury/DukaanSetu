@@ -59,9 +59,20 @@ export const ProductProvider = ({ children }) => {
     }
   };
 
+  const formatPayload = (productData) => {
+    const payload = {
+      ...productData,
+      brand: productData.brandName,
+      supplier: productData.supplierName,
+    };
+    delete payload.brandName;
+    delete payload.supplierName;
+    return payload;
+  };
+
   const createProduct = async (productData) => {
     try {
-      const { data } = await api.post('/products', productData);
+      const { data } = await api.post('/products', formatPayload(productData));
       toast.success('Product added successfully!');
       fetchStats();
       return data.product;
@@ -73,7 +84,7 @@ export const ProductProvider = ({ children }) => {
 
   const updateProduct = async (id, productData) => {
     try {
-      const { data } = await api.put(`/products/${id}`, productData);
+      const { data } = await api.put(`/products/${id}`, formatPayload(productData));
       toast.success('Product updated successfully!');
       fetchStats();
       return data.product;

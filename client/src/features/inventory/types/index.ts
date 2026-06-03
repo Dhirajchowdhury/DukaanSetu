@@ -17,6 +17,13 @@ export interface Product {
   status: ProductStatus;
   sku: string;
   lastUpdated: string;
+  brand?: string | null;
+  brandName?: string | null;
+  unit?: string | null;
+  costPrice?: number | null;
+  batchNumber?: string | null;
+  supplier?: string | null;
+  supplierName?: string | null;
 }
 
 export type SortField = 'name' | 'quantity' | 'expiryDate' | 'status' | 'lastUpdated';
