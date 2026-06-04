@@ -18,18 +18,27 @@ export default function SubscriptionsPage() {
     setLoading(true);
     try {
       const res = await fetch(`${API}/subscriptions`, { credentials: 'include' });
+      if (!res.ok) {
+        if (res.status >= 500) toast.error('Server error loading subscriptions.');
+        setSubscriptions([]);
+        return;
+      }
       const data = await res.json();
       setSubscriptions(data.subscriptions || []);
-    } catch (err) { toast.error('Failed to load subscriptions'); }
-    finally { setLoading(false); }
+    } catch {
+      setSubscriptions([]); // network error — silent
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const fetchCustomers = async () => {
     try {
       const res = await fetch(`${API}/customers?limit=200`, { credentials: 'include' });
+      if (!res.ok) { setCustomers([]); return; }
       const data = await res.json();
       setCustomers(data.customers || []);
-    } catch (err) { /* ignore */ }
+    } catch { /* ignore */ }
   };
 
   useEffect(() => { fetchSubscriptions(); fetchCustomers(); }, [fetchSubscriptions]);

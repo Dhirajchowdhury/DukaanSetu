@@ -170,9 +170,9 @@ const Reports = () => {
     <div className="dashboard-layout">
       <Sidebar />
       <main className="dashboard-main">
-        <div className="page-header">
-          <h1>Reports & Analytics</h1>
-          <p>Insights into your business performance.</p>
+        <div className="mb-8">
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Reports & Analytics</h1>
+          <p className="text-gray-500 mt-1">Insights into your business performance.</p>
         </div>
 
         {/* Tabs */}
@@ -189,19 +189,17 @@ const Reports = () => {
         {/* ────── INVENTORY TAB ────── */}
         {activeTab === 'inventory' && (
           <>
-            <div className="reports-summary">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               {[
-                { icon: <FiPackage />, label: 'Total Products', value: stats?.totalItems ?? '—', color: 'primary' },
-                { icon: <FiTrendingUp />, label: 'Inventory Value', value: stats ? fmt(stats.totalValue || 0) : '—', color: 'success' },
-                { icon: <FiAlertTriangle />, label: 'Low Stock', value: stats?.lowStockCount ?? '—', color: 'warning' },
-                { icon: <FiClock />, label: 'Expiring Soon', value: stats?.expiringSoonCount ?? '—', color: 'danger' },
+                { icon: <FiPackage />, label: 'Total Products', value: stats?.totalItems ?? '—', color: 'text-indigo-600' },
+                { icon: <FiTrendingUp />, label: 'Inventory Value', value: stats ? fmt(stats.totalValue || 0) : '—', color: 'text-green-600' },
+                { icon: <FiAlertTriangle />, label: 'Low Stock', value: stats?.lowStockCount ?? '—', color: 'text-amber-600' },
+                { icon: <FiClock />, label: 'Expiring Soon', value: stats?.expiringSoonCount ?? '—', color: 'text-red-600' },
               ].map((s, i) => (
-                <div key={i} className={`report-stat card report-stat--${s.color}`}>
-                  <div className={`report-stat__icon report-stat__icon--${s.color}`}>{s.icon}</div>
-                  <div>
-                    <p className="report-stat__value">{s.value}</p>
-                    <p className="report-stat__label">{s.label}</p>
-                  </div>
+                <div key={i} className="bg-white rounded-xl border p-4 flex flex-col justify-center items-center text-center">
+                  <div className={`text-2xl mb-2 ${s.color}`}>{s.icon}</div>
+                  <p className="text-2xl font-bold text-gray-900">{s.value}</p>
+                  <p className="text-xs text-gray-500">{s.label}</p>
                 </div>
               ))}
             </div>
@@ -314,7 +312,7 @@ const Reports = () => {
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl border border-gray-200 p-5 h-[300px]">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 h-[300px]">
                   <h3 className="text-sm font-semibold mb-3">Revenue Over Time</h3>
                   <div className="h-[230px]">
                     <Line data={{
@@ -436,7 +434,7 @@ const Reports = () => {
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl border border-gray-200 p-5 h-[350px]">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 h-[350px]">
                   <h3 className="text-sm font-semibold mb-3">Monthly Profit / Loss</h3>
                   <div className="h-[280px]">
                     <Bar data={{

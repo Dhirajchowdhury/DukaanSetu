@@ -48,6 +48,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [selectedUnitOption, setSelectedUnitOption] = useState('');
   const [customUnit, setCustomUnit] = useState('');
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   /* ── Fetch categories whenever modal opens ── */
   useEffect(() => {
     if (!isOpen) return;
@@ -118,30 +120,35 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     return e;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
+    setIsSubmitting(true);
     const finalUnit = selectedUnitOption === 'other' ? customUnit.trim() : selectedUnitOption;
 
-    onSubmit({
-      productName:          formData.name,
-      categoryId:           formData.categoryId,
-      quantity:             formData.quantity,
-      sellingPrice:         formData.price,
-      expiryDate:           formData.expiryDate
-                              ? new Date(formData.expiryDate).toISOString()
-                              : null,
-      lowStockThreshold:    formData.lowStockThreshold,
-      lowStockAlertEnabled: formData.lowStockAlertEnabled,
-      minimumOrderQuantity: formData.minimumOrderQuantity !== '' ? parseInt(String(formData.minimumOrderQuantity)) : null,
-      brandName:            formData.brandName,
-      costPrice:            formData.costPrice,
-      batchNumber:          formData.batchNumber,
-      supplierName:         formData.supplierName,
-      unit:                 finalUnit || null,
-    });
+    try {
+      await onSubmit({
+        productName:          formData.name,
+        categoryId:           formData.categoryId,
+        quantity:             formData.quantity,
+        sellingPrice:         formData.price,
+        expiryDate:           formData.expiryDate
+                                ? new Date(formData.expiryDate).toISOString()
+                                : null,
+        lowStockThreshold:    formData.lowStockThreshold,
+        lowStockAlertEnabled: formData.lowStockAlertEnabled,
+        minimumOrderQuantity: formData.minimumOrderQuantity !== '' ? parseInt(String(formData.minimumOrderQuantity)) : null,
+        brandName:            formData.brandName,
+        costPrice:            formData.costPrice,
+        batchNumber:          formData.batchNumber,
+        supplierName:         formData.supplierName,
+        unit:                 finalUnit || null,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const field = (key: string, value: string) =>
@@ -150,21 +157,23 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }`;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content max-w-3xl w-full bg-white rounded-2xl shadow-2xl overflow-hidden animate-slideUp" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 p-4 sm:p-0" onClick={onClose}>
+      <div className="modal-content md:relative fixed inset-0 md:h-auto h-full w-full md:max-w-3xl bg-white md:rounded-2xl shadow-2xl flex flex-col animate-slideUp" onClick={(e) => e.stopPropagation()}>
 
         {/* Header */}
-        <div className="modal-header border-b border-gray-200 px-6 py-4 flex justify-between items-center bg-gray-50">
+        <div className="modal-header border-b border-gray-200 px-6 py-4 flex justify-between items-center bg-gray-50 md:rounded-t-2xl shrink-0">
           <h2 className="text-lg font-bold text-gray-800">
             {initialData ? 'Edit Product' : 'Add New Product'}
           </h2>
           <button className="text-gray-400 hover:text-gray-600 transition-colors text-xl" onClick={onClose}><FiX /></button>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body p-6 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="modal-body p-6 overflow-y-auto flex-1 space-y-6">
 
-            {/* Row 1: Product Name & Brand Name */}
+            {/* Basic Info */}
+            <section>
+              <h3 className="text-md font-bold text-gray-800 mb-3 border-b pb-1">Basic Info</h3>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="form-group mb-0">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -270,7 +279,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </div>
             </div>
 
-            {/* Row 4: Selling Price & Cost Price */}
+            </section>
+
+            {/* Pricing */}
+            <section>
+              <h3 className="text-md font-bold text-gray-800 mb-3 border-b pb-1 mt-6">Pricing</h3>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="form-group mb-0">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -307,7 +320,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </div>
             </div>
 
-            {/* Row 5: Expiry Date & Batch Number */}
+            </section>
+
+            {/* Stock & Supplier */}
+            <section>
+              <h3 className="text-md font-bold text-gray-800 mb-3 border-b pb-1 mt-6">Stock & Supplier</h3>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="form-group mb-0">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -428,22 +445,25 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </div>
               )}
             </div>
+            </section>
           </div>
 
           {/* Footer */}
-          <div className="modal-footer bg-gray-50 border-t border-gray-200 flex justify-end gap-3 p-4 rounded-b-2xl">
+          <div className="modal-footer bg-gray-50 border-t border-gray-200 flex justify-end gap-3 p-4 md:rounded-b-2xl shrink-0">
             <button
               type="button"
               className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               onClick={onClose}
+              disabled={isSubmitting}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-teal-600 text-white font-semibold text-sm rounded-lg hover:bg-teal-700 transition-colors shadow-md shadow-teal-100"
+              disabled={isSubmitting}
+              className={`px-6 py-2 bg-teal-600 text-white font-semibold text-sm rounded-lg transition-colors shadow-md shadow-teal-100 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:bg-teal-700'}`}
             >
-              {initialData ? 'Save Changes' : 'Add Product'}
+              {isSubmitting ? 'Saving...' : initialData ? 'Save Changes' : 'Add Product'}
             </button>
           </div>
         </form>

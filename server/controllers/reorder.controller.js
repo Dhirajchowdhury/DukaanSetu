@@ -111,12 +111,13 @@ const updateRule = async (req, res, next) => {
     const { isActive, triggerQty, reorderQty } = req.body;
 
     // Verify ownership
-    const { data: existing } = await supabase
+    const { data: existing, error: fetchErr } = await supabase
       .from('reorder_rules')
       .select('id, user_id')
       .eq('id', req.params.id)
       .maybeSingle();
 
+    if (fetchErr) throw fetchErr;
     if (!existing) return res.status(404).json({ message: 'Rule not found' });
     if (existing.user_id !== req.user.id) return res.status(403).json({ message: 'Not authorized' });
 
@@ -149,12 +150,13 @@ const updateRule = async (req, res, next) => {
  */
 const deleteRule = async (req, res, next) => {
   try {
-    const { data: existing } = await supabase
+    const { data: existing, error: fetchErr } = await supabase
       .from('reorder_rules')
       .select('id, user_id')
       .eq('id', req.params.id)
       .maybeSingle();
 
+    if (fetchErr) throw fetchErr;
     if (!existing) return res.status(404).json({ message: 'Rule not found' });
     if (existing.user_id !== req.user.id) return res.status(403).json({ message: 'Not authorized' });
 

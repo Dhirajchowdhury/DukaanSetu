@@ -106,6 +106,8 @@
   background: var(--primary);
   color: #fff;
   box-shadow: 0 4px 12px rgba(79,70,229,0.25);
+  border-left: 3px solid var(--primary-hover);
+  padding-left: 13px; /* compensate for 3px border so text doesn't shift */
 }
 .sidebar__item--active:hover {
   background: var(--primary-hover);

@@ -68,8 +68,9 @@ const getExpenses = async (req, res, next) => {
 const updateExpense = async (req, res, next) => {
   try {
     const { amount, category, description, date } = req.body;
-    const { data: existing } = await supabase
+    const { data: existing, error: fetchErr } = await supabase
       .from('expenses').select('id, user_id').eq('id', req.params.id).single();
+    if (fetchErr && fetchErr.code !== 'PGRST116') throw fetchErr; // PGRST116 is no rows returned
     if (!existing) return res.status(404).json({ message: 'Expense not found' });
     if (existing.user_id !== req.user.id) return res.status(403).json({ message: 'Unauthorized' });
 
@@ -89,8 +90,9 @@ const updateExpense = async (req, res, next) => {
 
 const deleteExpense = async (req, res, next) => {
   try {
-    const { data: existing } = await supabase
+    const { data: existing, error: fetchErr } = await supabase
       .from('expenses').select('id, user_id').eq('id', req.params.id).single();
+    if (fetchErr && fetchErr.code !== 'PGRST116') throw fetchErr;
     if (!existing) return res.status(404).json({ message: 'Expense not found' });
     if (existing.user_id !== req.user.id) return res.status(403).json({ message: 'Unauthorized' });
 

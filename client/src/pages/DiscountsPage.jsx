@@ -24,10 +24,18 @@ export default function DiscountsPage() {
     setLoading(true);
     try {
       const res = await fetch(`${API}/discount-rules`, { credentials: 'include' });
+      if (!res.ok) {
+        if (res.status >= 500) toast.error('Server error loading discount rules.');
+        setRules([]);
+        return;
+      }
       const data = await res.json();
       setRules(data.rules || []);
-    } catch (err) { toast.error('Failed to load discount rules'); }
-    finally { setLoading(false); }
+    } catch {
+      setRules([]); // network error — silent
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchRules(); }, [fetchRules]);

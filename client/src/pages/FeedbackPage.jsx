@@ -17,16 +17,31 @@ export default function FeedbackPage() {
     try {
       const params = new URLSearchParams();
       if (ratingFilter) params.set('rating', ratingFilter);
+
       const [feedRes, statsRes] = await Promise.all([
         fetch(`${API}/feedback?${params}`, { credentials: 'include' }),
         fetch(`${API}/feedback/stats`, { credentials: 'include' }),
       ]);
-      const feedData = await feedRes.json();
-      const statsData = await statsRes.json();
+
+      // If endpoint doesn't exist (404) or DB not set up — silent empty state
+      if (!feedRes.ok) {
+        if (feedRes.status >= 500) toast.error('Server error loading feedback.');
+        setFeedback([]);
+        setStats(null);
+        return;
+      }
+
+      const feedData  = await feedRes.json();
+      const statsData = statsRes.ok ? await statsRes.json() : { stats: null };
       setFeedback(feedData.feedback || []);
       setStats(statsData.stats || null);
-    } catch (err) { toast.error('Failed to load feedback'); }
-    finally { setLoading(false); }
+    } catch {
+      // Network error — silent fallback
+      setFeedback([]);
+      setStats(null);
+    } finally {
+      setLoading(false);
+    }
   }, [ratingFilter]);
 
   useEffect(() => { fetchFeedback(); }, [fetchFeedback]);

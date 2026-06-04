@@ -11,7 +11,8 @@ const StatsCards = ({ stats, products }) => {
       label: 'TOTAL PRODUCTS',
       value: stats?.totalItems ?? '—',
       sub: 'items in inventory',
-      iconClass: 'bg-indigo-50 text-indigo-600',
+      iconBg: '#eef2ff',
+      iconColor: '#4f46e5',
       path: '/products',
     },
     {
@@ -19,7 +20,8 @@ const StatsCards = ({ stats, products }) => {
       label: 'LOW STOCK',
       value: stats?.lowStockCount ?? '—',
       sub: 'need restocking',
-      iconClass: 'bg-amber-50 text-amber-500',
+      iconBg: '#fffbeb',
+      iconColor: '#f59e0b',
       path: '/reports?filter=low',
     },
     {
@@ -27,40 +29,115 @@ const StatsCards = ({ stats, products }) => {
       label: 'EXPIRING SOON',
       value: stats?.expiringSoonCount ?? '—',
       sub: 'within 7 days',
-      iconClass: 'bg-red-50 text-red-500',
+      iconBg: '#fef2f2',
+      iconColor: '#ef4444',
       path: '/reports?filter=expiring',
     },
     {
       icon: <FiTrendingUp />,
       label: 'INVENTORY VALUE',
-      value: stats ? `₹${(stats.totalValue || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '—',
+      value: stats
+        ? `₹${(stats.totalValue || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+        : '—',
       sub: 'total stock value',
-      iconClass: 'bg-yellow-50 text-yellow-600',
+      iconBg: '#fefce8',
+      iconColor: '#ca8a04',
       path: '/products',
     },
   ];
 
-  const cardStyle = "bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex items-center gap-5 min-h-[110px] md:min-h-[120px] hover:shadow-md transition cursor-pointer w-full";
-  const iconContainerStyle = "p-3.5 rounded-2xl text-2xl flex-shrink-0 flex items-center justify-center";
-
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-6 w-full">
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '16px',
+        width: '100%',
+      }}
+    >
       {cards.map((card, i) => (
         <div
           key={i}
-          className={cardStyle}
           onClick={() => navigate(card.path)}
+          style={{
+            background: '#fff',
+            borderRadius: '16px',
+            border: '1px solid #e5e7eb',
+            boxShadow: '0 1px 3px rgba(0,0,0,.06)',
+            padding: '1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            minHeight: '100px',
+            overflow: 'hidden',
+            cursor: 'pointer',
+            transition: 'box-shadow .15s ease',
+          }}
+          onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,.1)'}
+          onMouseLeave={e => e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,.06)'}
         >
-          <div className={`${iconContainerStyle} ${card.iconClass}`}>
+          {/* Icon — fixed 48×48, flex-shrink-0 so text can't push it */}
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              minWidth: '48px',
+              borderRadius: '12px',
+              background: card.iconBg,
+              color: card.iconColor,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.35rem',
+              flexShrink: 0,
+            }}
+          >
             {card.icon}
           </div>
 
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider truncate">{card.label}</p>
-            <h2 className="text-xl lg:text-2xl font-extrabold text-gray-800 mt-1 truncate">
+          {/* Text — flex column so label/value/sub stack cleanly */}
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p
+              style={{
+                fontSize: '12px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: '#9ca3af',
+                margin: 0,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {card.label}
+            </p>
+
+            <p
+              style={{
+                fontSize: '28px',
+                fontWeight: 500,
+                color: '#111827',
+                lineHeight: 1.15,
+                margin: '4px 0 3px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
               {stats === null ? '—' : card.value}
-            </h2>
-            <p className="text-xs text-gray-400 mt-0.5 whitespace-nowrap">{card.sub}</p>
+            </p>
+
+            <p
+              style={{
+                fontSize: '13px',
+                color: '#9ca3af',
+                margin: 0,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {card.sub}
+            </p>
           </div>
         </div>
       ))}

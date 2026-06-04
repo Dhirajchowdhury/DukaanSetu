@@ -381,16 +381,64 @@ const DashboardContent = () => {
 
       {/* 3. FEATURE CARDS */}
       {tips && tips.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '16px',
+          }}
+        >
           {tips.map((tip, i) => (
             <div
               key={i}
-              className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition flex gap-5 items-start min-h-[110px]"
+              style={{
+                background: '#fff',
+                borderRadius: '16px',
+                border: '1px solid #e5e7eb',
+                padding: '1.25rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px',
+                minHeight: '80px',
+                boxShadow: '0 1px 3px rgba(0,0,0,.05)',
+              }}
             >
-              {tip.icon && <span className="text-3xl flex-shrink-0">{tip.icon}</span>}
-              <div>
-                <h3 className="font-bold text-gray-800 mb-1.5">{tip.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{tip.desc}</p>
+              {/* Icon — fixed 40×40, flex-shrink-0 so it never pushes text */}
+              <span
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  minWidth: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem',
+                  flexShrink: 0,
+                }}
+              >
+                {tip.icon}
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <h3
+                  style={{
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    color: '#111827',
+                    marginBottom: '4px',
+                  }}
+                >
+                  {tip.title}
+                </h3>
+                <p
+                  style={{
+                    fontSize: '13px',
+                    color: '#6b7280',
+                    lineHeight: 1.5,
+                    margin: 0,
+                  }}
+                >
+                  {tip.desc}
+                </p>
               </div>
             </div>
           ))}
@@ -398,34 +446,82 @@ const DashboardContent = () => {
       )}
 
       {/* 4. INSIGHTS */}
-      <div className="mt-4 md:mt-8">
-        <h2 className="text-xl font-bold text-gray-800 mb-5">
+      <div style={{ marginTop: '16px' }}>
+        <h2
+          style={{
+            fontSize: '18px',
+            fontWeight: 500,
+            color: '#111827',
+            marginBottom: '16px',
+          }}
+        >
           Inventory Insights
         </h2>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-          <div className="bg-white rounded-xl border border-gray-200 p-5 h-[300px] flex flex-col">
-            <h3 className="text-sm font-semibold mb-3">Stock Growth</h3>
-            <div className="flex-1 min-h-0 relative">
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '16px',
+          }}
+          className="insights-grid"
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '12px',
+              border: '1px solid #e5e7eb',
+              padding: '1rem',
+              minHeight: '280px',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <h3 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px', color: '#374151' }}>
+              Stock Growth
+            </h3>
+            <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
               <Line data={stockGrowthData} options={lineOptions} />
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 p-5 h-[300px] flex flex-col">
-            <h3 className="text-sm font-semibold mb-3">Products Added Over Time</h3>
-            <div className="flex-1 min-h-0 relative">
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '12px',
+              border: '1px solid #e5e7eb',
+              padding: '1rem',
+              minHeight: '280px',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <h3 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px', color: '#374151' }}>
+              Products Added Over Time
+            </h3>
+            <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
               <Bar data={productsAddedData} options={barOptions} />
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 p-5 h-[300px] flex flex-col">
-            <h3 className="text-sm font-semibold mb-3">Category Distribution</h3>
-            <div className="flex-1 min-h-0 relative">
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '12px',
+              border: '1px solid #e5e7eb',
+              padding: '1rem',
+              minHeight: '280px',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <h3 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px', color: '#374151' }}>
+              Category Distribution
+            </h3>
+            <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
               <Pie data={categoryDistributionData} options={pieOptions} />
             </div>
           </div>
-
         </div>
       </div>
 

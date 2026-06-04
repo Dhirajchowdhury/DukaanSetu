@@ -80,8 +80,8 @@ const Orders = () => {
     switch (status) {
       case 'pending':    return <FiClock className="text-amber-500" />;
       case 'accepted':   return <FiCheckCircle className="text-blue-500" />;
-      case 'dispatched': return <FiTruck className="text-indigo-500" />;
-      case 'delivered':  return <FiCheckCircle className="text-teal-500" />;
+      case 'dispatched': return <FiTruck className="text-purple-500" />;
+      case 'delivered':  return <FiCheckCircle className="text-green-500" />;
       case 'cancelled':  return <FiXCircle className="text-red-500" />;
       case 'rejected':   return <FiXCircle className="text-red-500" />;
       default:           return null;
@@ -93,8 +93,8 @@ const Orders = () => {
     switch (status) {
       case 'pending':    return `${base} bg-amber-50 text-amber-700 border border-amber-100`;
       case 'accepted':   return `${base} bg-blue-50 text-blue-700 border border-blue-100`;
-      case 'dispatched': return `${base} bg-indigo-50 text-indigo-700 border border-indigo-100`;
-      case 'delivered':  return `${base} bg-teal-50 text-teal-700 border border-teal-100`;
+      case 'dispatched': return `${base} bg-purple-50 text-purple-700 border border-purple-100`;
+      case 'delivered':  return `${base} bg-green-50 text-green-700 border border-green-100`;
       case 'cancelled':  return `${base} bg-red-50 text-red-700 border border-red-100`;
       case 'rejected':   return `${base} bg-red-50 text-red-700 border border-red-100`;
       default:           return base;
@@ -102,149 +102,219 @@ const Orders = () => {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto min-h-screen bg-gray-50">
+    <div style={{ padding: '32px', maxWidth: '1100px', margin: '0 auto', minHeight: '100vh', background: '#f9fafb' }}>
 
       {/* ── Page header ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Orders</h1>
-          <p className="text-gray-500 mt-1">Track and manage all your marketplace transactions.</p>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: 500, color: '#111827', margin: 0 }}>Orders</h1>
+        <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
+          Track and manage all your marketplace transactions.
+        </p>
+      </div>
+
+      {/* ── Tab row + CTA ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+
+        {/* Segmented tab switcher */}
+        <div style={{
+          display: 'flex',
+          background: '#f3f4f6',
+          borderRadius: '10px',
+          padding: '4px',
+          width: 'fit-content',
+          gap: 0,
+        }}>
+          {[['all', 'All'], ['buyer', "I'm Buying"], ['seller', "I'm Selling"]].map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setFilter(val)}
+              style={{
+                padding: '6px 16px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: filter === val ? 500 : 400,
+                border: 'none',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all .15s ease',
+                background:   filter === val ? '#fff' : 'transparent',
+                color:        filter === val ? '#111827' : '#6b7280',
+                boxShadow:    filter === val ? '0 1px 3px rgba(0,0,0,.08)' : 'none',
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Role tabs */}
-          <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100 w-fit">
-            {[['all', 'All'], ['buyer', "I'm Buying"], ['seller', "I'm Selling"]].map(([val, label]) => (
-              <button
-                key={val}
-                onClick={() => setFilter(val)}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                  filter === val ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Place new order CTA */}
-          <button
-            onClick={() => navigate('/orders/new')}
-            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all hover:shadow-md"
-            style={{ whiteSpace: 'nowrap' }}
-          >
-            <FiPlus size={16} />
-            Place Bulk Order
-          </button>
-        </div>
+        {/* Place Bulk Order CTA */}
+        <button
+          onClick={() => navigate('/orders/new')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 18px',
+            background: '#4f46e5',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '10px',
+            fontWeight: 600,
+            fontSize: '13px',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 1px 4px rgba(79,70,229,.3)',
+            transition: 'background .15s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#4338ca'}
+          onMouseLeave={e => e.currentTarget.style.background = '#4f46e5'}
+        >
+          <FiPlus size={15} />
+          Place Bulk Order
+        </button>
       </div>
 
       {/* ── Order list ── */}
       {loading ? (
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-24 bg-white rounded-2xl animate-pulse border border-gray-100 shadow-sm" />
+            <div key={i} style={{ height: '88px', background: '#fff', borderRadius: '14px', border: '1px solid #f3f4f6', animation: 'pulse 1.5s infinite' }} />
           ))}
         </div>
       ) : orders.length === 0 ? (
-        <div className="bg-white rounded-3xl p-20 text-center border border-dashed border-gray-200">
-          <div className="text-6xl mb-4">📦</div>
-          <h3 className="text-xl font-bold text-gray-800">No orders found</h3>
-          <p className="text-gray-500 mb-6">When you place or receive orders, they will appear here.</p>
+        /* ── FIX 3: polished empty state ── */
+        <div style={{
+          minHeight: '400px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#fff',
+          borderRadius: '20px',
+          border: '1.5px dashed #e5e7eb',
+          padding: '48px 24px',
+          textAlign: 'center',
+        }}>
+          <div style={{ fontSize: '64px', lineHeight: 1, marginBottom: '20px' }}>📦</div>
+          <h3 style={{ fontSize: '18px', fontWeight: 500, color: '#111827', margin: '0 0 8px' }}>
+            No orders found
+          </h3>
+          <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px', maxWidth: '340px', lineHeight: 1.6 }}>
+            When you place or receive orders, they will appear here.
+          </p>
           <button
             onClick={() => navigate('/orders/new')}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 24px',
+              background: '#4f46e5',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '10px',
+              fontWeight: 600,
+              fontSize: '14px',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(79,70,229,.25)',
+            }}
           >
             <FiPlus size={15} />
             Place Your First Order
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
+        /* ── FIX 4: order cards ── */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {orders.map((order) => {
-            const isSeller = order.seller_id === user?.id;
+            const isSeller   = order.seller_id === user?.id;
             const totalItems = order.items?.length || 0;
+
+            /* Status pill styles */
+            const statusStyles = {
+              pending:    { background: '#fffbeb', color: '#b45309' },
+              accepted:   { background: '#eff6ff', color: '#1d4ed8' },
+              dispatched: { background: '#f5f3ff', color: '#7c3aed' },
+              delivered:  { background: '#f0fdf4', color: '#15803d' },
+              cancelled:  { background: '#fef2f2', color: '#b91c1c' },
+              rejected:   { background: '#fef2f2', color: '#b91c1c' },
+            };
+            const pillBase = {
+              fontSize: '12px',
+              padding: '3px 10px',
+              borderRadius: '20px',
+              fontWeight: 500,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              ...(statusStyles[order.status] || { background: '#f3f4f6', color: '#374151' }),
+            };
 
             return (
               <div
                 key={order.id}
                 onClick={() => setSelectedOrder(order)}
-                className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer flex flex-col md:flex-row gap-6 group"
+                style={{
+                  background: '#fff',
+                  borderRadius: '14px',
+                  border: '1px solid #e5e7eb',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '20px',
+                  cursor: 'pointer',
+                  transition: 'box-shadow .15s, border-color .15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,.07)'; e.currentTarget.style.borderColor = '#c7d2fe'; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#e5e7eb'; }}
               >
-                {/* Left: items preview */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className={getStatusBadge(order.status)}>
-                      {getStatusIcon(order.status)}
-                      {order.status}
-                    </div>
-                    <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest bg-gray-50 px-2 py-0.5 rounded">
-                      #{order.id?.slice(0, 8)}
-                    </span>
-                    <span className="text-xs text-gray-400 ml-auto md:ml-0">
-                      {new Date(order.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </span>
-                  </div>
+                {/* Left: order ID + date */}
+                <div style={{ minWidth: '120px', flexShrink: 0 }}>
+                  <p style={{ fontWeight: 700, fontSize: '13px', color: '#111827', margin: 0 }}>
+                    #{order.id?.slice(0, 8)}
+                  </p>
+                  <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '3px' }}>
+                    {new Date(order.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                </div>
 
-                  {/* Items preview — show up to 2, rest as "+N more" */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-                    {(order.items || []).slice(0, 2).map((item, idx) => (
-                      <div key={item.id || idx} className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <FiPackage className="text-base text-indigo-500" />
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-bold text-gray-900 truncate">
-                            {item.product?.product_name || 'Product'}
-                          </h4>
-                          <p className="text-xs text-gray-500">
-                            {item.quantity} {item.product?.unit || 'units'} × {fmt(item.price)}
-                            {' = '}
-                            <strong className="text-gray-700">{fmt(item.quantity * item.price)}</strong>
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                    {totalItems > 2 && (
-                      <span className="text-xs text-indigo-500 font-semibold pl-11">
-                        +{totalItems - 2} more item{totalItems - 2 > 1 ? 's' : ''}
+                {/* Middle: buyer/seller name + item count badge */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontWeight: 500, fontSize: '14px', color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {isSeller ? order.buyer?.shop_name : order.seller?.shop_name}
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                    <span style={{ fontSize: '12px', color: '#6b7280' }}>{isSeller ? 'Buyer' : 'Supplier'}</span>
+                    {totalItems > 0 && (
+                      <span style={{ fontSize: '11px', background: '#eff6ff', color: '#3b82f6', borderRadius: '20px', padding: '2px 8px', fontWeight: 600 }}>
+                        {totalItems} item{totalItems !== 1 ? 's' : ''}
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Right: total + counterparty */}
-                <div className="flex flex-row md:flex-col justify-between items-end md:w-44 text-right gap-2 border-t md:border-t-0 md:border-l border-gray-50 pt-4 md:pt-0 md:pl-6 flex-shrink-0">
-                  <div>
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Grand Total</p>
-                    <p className="text-2xl font-black text-gray-900">{fmt(order.total_price)}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{totalItems} item{totalItems !== 1 ? 's' : ''}</p>
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    <p className="font-semibold">{isSeller ? 'Buyer' : 'Supplier'}</p>
-                    {isSeller ? (
-                      <Link to={`/buyer/${order.buyer_id}`} className="text-indigo-600 hover:text-indigo-800 font-semibold truncate max-w-[120px] block hover:underline" onClick={e => e.stopPropagation()}>
-                        {order.buyer?.shop_name}
-                      </Link>
-                    ) : (
-                      <p className="text-gray-400 truncate max-w-[120px]">
-                        {order.seller?.shop_name}
-                      </p>
-                    )}
+                {/* Right: total + status */}
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <p style={{ fontWeight: 700, fontSize: '16px', color: '#111827', margin: 0 }}>
+                    {fmt(order.total_price)}
+                  </p>
+                  <div style={{ marginTop: '6px' }}>
+                    <span style={pillBase}>
+                      {getStatusIcon(order.status)}
+                      {order.status}
+                    </span>
                   </div>
                 </div>
 
-                {/* Chevron + Repeat Order */}
-                <div className="hidden md:flex flex-col items-center gap-2 self-center ml-auto">
+                {/* Repeat + chevron */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                   <button
                     onClick={(e) => handleRepeatOrder(e, order)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 rounded-lg transition-all whitespace-nowrap"
-                    title="Repeat this order"
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', fontSize: '12px', fontWeight: 600, color: '#4f46e5', background: '#eff6ff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
                   >
-                    <FiRepeat size={12} />
-                    Repeat
+                    <FiRepeat size={11} /> Repeat
                   </button>
-                  <FiChevronRight size={18} className="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <FiChevronRight size={16} style={{ color: '#d1d5db' }} />
                 </div>
               </div>
             );

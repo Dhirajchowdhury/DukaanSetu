@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   FiX, FiPackage, FiCheckCircle, FiXCircle, FiClock,
   FiTruck, FiMapPin, FiFileText, FiUser, FiCalendar,
@@ -11,8 +11,8 @@ const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
 const STATUS_META = {
   pending:    { label: 'Pending',    icon: <FiClock />,        color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
   accepted:   { label: 'Accepted',   icon: <FiCheckCircle />,  color: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe' },
-  dispatched: { label: 'Dispatched', icon: <FiTruck />,        color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe' },
-  delivered:  { label: 'Delivered',  icon: <FiCheckCircle />,  color: '#10b981', bg: '#ecfdf5', border: '#a7f3d0' },
+  dispatched: { label: 'Dispatched', icon: <FiTruck />,        color: '#a855f7', bg: '#faf5ff', border: '#e9d5ff' },
+  delivered:  { label: 'Delivered',  icon: <FiCheckCircle />,  color: '#22c55e', bg: '#f0fdf4', border: '#bbf7d0' },
   cancelled:  { label: 'Cancelled',  icon: <FiXCircle />,      color: '#ef4444', bg: '#fef2f2', border: '#fca5a5' },
   rejected:   { label: 'Rejected',   icon: <FiXCircle />,      color: '#ef4444', bg: '#fef2f2', border: '#fca5a5' },
 };
@@ -22,6 +22,8 @@ const TIMELINE = ['pending', 'accepted', 'dispatched', 'delivered'];
 // ── component ────────────────────────────────────────────────────────────────
 
 const OrderDetail = ({ order, currentUserId, onClose, onUpdateStatus }) => {
+  const [confirmAction, setConfirmAction] = useState(null);
+
   if (!order) return null;
 
   const isSeller = order.seller_id === currentUserId;
@@ -96,17 +98,17 @@ const OrderDetail = ({ order, currentUserId, onClose, onUpdateStatus }) => {
           </div>
         </div>
 
-        {/* ── Timeline ── */}
+        {/* ── Timeline (Vertical Stepper) ── */}
         {order.status !== 'cancelled' && order.status !== 'rejected' && (
           <div style={{ padding: '20px 24px 0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {TIMELINE.map((step, i) => {
                 const done    = i <= timelineIdx;
                 const current = i === timelineIdx;
                 const stepMeta = STATUS_META[step];
                 return (
                   <React.Fragment key={step}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flex: '0 0 auto' }}>
+                    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                       <div style={{
                         width: 28, height: 28, borderRadius: '50%',
                         background: done ? stepMeta.color : '#e5e7eb',
@@ -118,13 +120,13 @@ const OrderDetail = ({ order, currentUserId, onClose, onUpdateStatus }) => {
                       }}>
                         {done ? <FiCheckCircle size={13} /> : <span style={{ fontSize: 10, fontWeight: 700 }}>{i + 1}</span>}
                       </div>
-                      <span style={{ fontSize: 9, fontWeight: 700, color: done ? stepMeta.color : '#9ca3af', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: done ? stepMeta.color : '#9ca3af', textTransform: 'uppercase', letterSpacing: '.04em' }}>
                         {stepMeta.label}
                       </span>
                     </div>
                     {i < TIMELINE.length - 1 && (
                       <div style={{
-                        flex: 1, height: 2, margin: '-14px 0 0',
+                        width: 2, height: 24, margin: '4px 0 4px 13px',
                         background: i < timelineIdx ? '#4f46e5' : '#e5e7eb',
                         transition: 'background .3s',
                       }} />
@@ -264,71 +266,104 @@ const OrderDetail = ({ order, currentUserId, onClose, onUpdateStatus }) => {
 
         {/* ── Action buttons ── */}
         <div style={{ padding: '24px', marginTop: 'auto' }}>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {isSeller && order.status === 'pending' && (
-              <>
+          {confirmAction ? (
+            <div style={{ padding: '16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12 }}>
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#92400e', marginBottom: 12 }}>
+                Are you sure you want to {confirmAction.label.toLowerCase()}?
+              </p>
+              <div style={{ display: 'flex', gap: 10 }}>
                 <button
-                  onClick={() => onUpdateStatus(order.id, 'accepted')}
+                  onClick={() => {
+                    onUpdateStatus(order.id, confirmAction.status);
+                    setConfirmAction(null);
+                  }}
+                  style={{
+                    flex: 1, padding: '10px 16px', borderRadius: 8,
+                    background: '#f59e0b', color: '#fff', border: 'none',
+                    fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  Yes, confirm
+                </button>
+                <button
+                  onClick={() => setConfirmAction(null)}
+                  style={{
+                    flex: 1, padding: '10px 16px', borderRadius: 8,
+                    background: '#fff', color: '#92400e', border: '1px solid #fcd34d',
+                    fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {isSeller && order.status === 'pending' && (
+                <>
+                  <button
+                    onClick={() => setConfirmAction({ status: 'accepted', label: 'Accept Order' })}
+                    style={{
+                      flex: 1, padding: '12px 20px', borderRadius: 12,
+                      background: '#4f46e5', color: '#fff', border: 'none',
+                      fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                      transition: 'all .18s',
+                    }}
+                  >
+                    ✅ Accept Order
+                  </button>
+                  <button
+                    onClick={() => setConfirmAction({ status: 'rejected', label: 'Reject Order' })}
+                    style={{
+                      flex: '0 0 auto', padding: '12px 20px', borderRadius: 12,
+                      background: '#fef2f2', color: '#ef4444', border: '1.5px solid #fca5a5',
+                      fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                      transition: 'all .18s',
+                    }}
+                  >
+                    Reject
+                  </button>
+                </>
+              )}
+              {isSeller && order.status === 'accepted' && (
+                <button
+                  onClick={() => setConfirmAction({ status: 'dispatched', label: 'Mark as Dispatched' })}
                   style={{
                     flex: 1, padding: '12px 20px', borderRadius: 12,
-                    background: '#4f46e5', color: '#fff', border: 'none',
+                    background: '#6366f1', color: '#fff', border: 'none',
                     fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                    transition: 'all .18s',
                   }}
                 >
-                  ✅ Accept Order
+                  🚚 Mark as Dispatched
                 </button>
+              )}
+              {isSeller && order.status === 'dispatched' && (
                 <button
-                  onClick={() => onUpdateStatus(order.id, 'rejected')}
+                  onClick={() => setConfirmAction({ status: 'delivered', label: 'Mark as Delivered' })}
                   style={{
-                    flex: '0 0 auto', padding: '12px 20px', borderRadius: 12,
-                    background: '#fef2f2', color: '#ef4444', border: '1.5px solid #fca5a5',
+                    flex: 1, padding: '12px 20px', borderRadius: 12,
+                    background: '#10b981', color: '#fff', border: 'none',
                     fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                    transition: 'all .18s',
                   }}
                 >
-                  Reject
+                  📦 Mark as Delivered
                 </button>
-              </>
-            )}
-            {isSeller && order.status === 'accepted' && (
-              <button
-                onClick={() => onUpdateStatus(order.id, 'dispatched')}
-                style={{
-                  flex: 1, padding: '12px 20px', borderRadius: 12,
-                  background: '#6366f1', color: '#fff', border: 'none',
-                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                }}
-              >
-                🚚 Mark as Dispatched
-              </button>
-            )}
-            {isSeller && order.status === 'dispatched' && (
-              <button
-                onClick={() => onUpdateStatus(order.id, 'delivered')}
-                style={{
-                  flex: 1, padding: '12px 20px', borderRadius: 12,
-                  background: '#10b981', color: '#fff', border: 'none',
-                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                }}
-              >
-                📦 Mark as Delivered
-              </button>
-            )}
-            {order.status === 'pending' && (
-              <button
-                onClick={() => onUpdateStatus(order.id, 'cancelled')}
-                style={{
-                  flex: !isSeller ? 1 : '0 0 auto',
-                  padding: '12px 20px', borderRadius: 12,
-                  background: '#f9fafb', color: '#6b7280', border: '1.5px solid #e5e7eb',
-                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                }}
-              >
-                Cancel Order
-              </button>
-            )}
-          </div>
+              )}
+              {order.status === 'pending' && (
+                <button
+                  onClick={() => setConfirmAction({ status: 'cancelled', label: 'Cancel Order' })}
+                  style={{
+                    flex: !isSeller ? 1 : '0 0 auto',
+                    padding: '12px 20px', borderRadius: 12,
+                    background: '#f9fafb', color: '#6b7280', border: '1.5px solid #e5e7eb',
+                    fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  Cancel Order
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

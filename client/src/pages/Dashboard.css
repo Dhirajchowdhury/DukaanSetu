@@ -50,3 +50,10 @@
   }
   .page-header-row { flex-direction: column; align-items: flex-start; }
 }
+
+/* Insights grid — responsive */
+@media (max-width: 900px) {
+  .insights-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

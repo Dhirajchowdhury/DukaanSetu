@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   FiHome, FiBox, FiTag, FiBarChart2, FiSettings,
@@ -46,6 +46,12 @@ const Sidebar = () => {
   const { t, i18n } = useTranslation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const activeRef = useRef(null);
+
+  // Auto-scroll the active nav item into view whenever the route changes
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     await logout();
@@ -83,17 +89,28 @@ const Sidebar = () => {
         {NAV_ITEMS.map((item) => {
           // Dashboard path is role-specific
           const resolvedPath = item.isDashboard ? getDashboardPath(user) : item.path;
+
+          // FIX: exact matching for every leaf route — no startsWith on items
+          // that share a prefix with another nav item.
           const active = item.isDashboard
+            // Dashboard: startsWith is correct because the resolved path is
+            // /dashboard/shop-owner etc. — no other nav item shares /dashboard
             ? location.pathname.startsWith('/dashboard')
             : item.path === '/products'
-              ? (location.pathname === '/products' || location.pathname === '/inventory')
-              : item.path === '/connect'
-                ? (location.pathname.startsWith('/connect') || location.pathname.startsWith('/profile'))
-                : location.pathname === item.path;
+              // /products is EXACT — /inventory/history must NOT activate it
+              ? location.pathname === '/products'
+            : item.path === '/connect'
+              // /connect covers the marketplace + profile detail pages
+              ? (location.pathname === '/connect' || location.pathname.startsWith('/connect/') || location.pathname.startsWith('/profile'))
+            : item.path !== null
+              // All other items: exact match only — fixes the double-highlight bug
+              ? location.pathname === item.path
+            : false;
           return (
             <Link
               key={item.labelKey}
               to={resolvedPath}
+              ref={active ? activeRef : null}
               className={`sidebar__item ${active ? 'sidebar__item--active' : ''}`}
               onClick={() => setMobileOpen(false)}
             >
