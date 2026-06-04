@@ -851,7 +851,11 @@ const ConnectFeature = () => {
         setSellerProducts([]);
       }
     } catch (error) {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted) {
+        setSelectedSellerId(null);
+        setProfileLoading(false);
+        return;
+      }
       if (isDev) {
         console.error("[viewSellerProfile] API error loading seller details:", error);
       }
@@ -863,9 +867,7 @@ const ConnectFeature = () => {
       setSelectedSellerId(null);
       navigate('/connect');
     } finally {
-      if (!controller.signal.aborted) {
-        setProfileLoading(false);
-      }
+      setProfileLoading(false);
       if (profileAbort.current === controller) {
         profileAbort.current = null;
       }

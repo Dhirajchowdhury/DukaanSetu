@@ -59,6 +59,11 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
+    // Silently ignore cancelled/aborted requests
+    if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+      return Promise.reject(error);
+    }
+
     console.error(`[API RESPONSE] [ERROR] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
       status: error.response?.status,
       message: error.response?.data?.message || error.message,
