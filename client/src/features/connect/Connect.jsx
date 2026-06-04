@@ -783,7 +783,6 @@ const ConnectFeature = () => {
     if (currentProfileId.current === userId) return;
     currentProfileId.current = userId;
 
-    let mounted = true;
     const isDev = process.env.NODE_ENV !== 'production';
 
     // Abort any in-flight fetch for a previous user
@@ -791,7 +790,7 @@ const ConnectFeature = () => {
       profileAbort.current.abort();
     }
     const controller = new AbortController();
-    const timeout = setTimeout(() => { if (controller && !controller.signal.aborted) controller.abort(); }, 15000);
+    const timeout = setTimeout(() => { if (controller && !controller.signal.aborted) controller.abort(); }, 8000);
     profileAbort.current = controller;
 
     setProfileLoading(true);
@@ -804,17 +803,16 @@ const ConnectFeature = () => {
       if (isDev) {
         console.log(`[viewSellerProfile] Cache hit for id: ${userId}`);
       }
-      if (!mounted) return;
       setSellerProfile(profileCache[userId].seller);
       setSellerListings(profileCache[userId].listings || []);
       setProfileLoading(false);
 
       try {
         const prodRes = await api.get(`/profile/products/${userId}`, { signal: controller.signal });
-        if (controller.signal.aborted || !mounted) return;
+        if (controller.signal.aborted) return;
         setSellerProducts(prodRes.data?.products || []);
       } catch {
-        if (controller.signal.aborted || !mounted) return;
+        if (controller.signal.aborted) return;
         setSellerProducts([]);
       }
       return;
@@ -827,7 +825,7 @@ const ConnectFeature = () => {
     try {
       const { data } = await api.get(`/profile/${userId}`, { signal: controller.signal });
       clearTimeout(timeout);
-      if (controller.signal.aborted || !mounted) return;
+      if (controller.signal.aborted) return;
 
       // 404 from backend
       if (!data.seller) {
@@ -837,6 +835,9 @@ const ConnectFeature = () => {
         navigate('/connect');
         return;
       }
+
+      // Re-set selectedSellerId in case a previous (aborted) request nullified it
+      setSelectedSellerId(userId);
 
       // Store in memory cache
       setProfileCache(prev => ({
@@ -849,20 +850,19 @@ const ConnectFeature = () => {
 
       try {
         const prodRes = await api.get(`/profile/products/${userId}`, { signal: controller.signal });
-        if (controller.signal.aborted || !mounted) return;
-        console.log("[SELLER PRODUCTS] Response:", prodRes.data);
+        if (controller.signal.aborted) return;
         setSellerProducts(prodRes.data?.products || []);
       } catch (prodErr) {
-        if (controller.signal.aborted || !mounted) return;
-        console.error("[SELLER PRODUCTS] Error:", prodErr);
+        if (controller.signal.aborted) return;
         setSellerProducts([]);
       }
     } catch (error) {
       clearTimeout(timeout);
-      if (controller.signal.aborted || !mounted) {
-        setSelectedSellerId(null);
+      // If a newer request is already in-flight, don't touch state
+      if (profileAbort.current !== controller) return;
+      if (controller.signal.aborted) {
         setProfileLoading(false);
-        setProfileError('Could not load profile. Please try again.');
+        setProfileError('Request timed out. Please go back and try again.');
         return;
       }
       if (isDev) {
@@ -878,8 +878,8 @@ const ConnectFeature = () => {
       navigate('/connect');
     } finally {
       clearTimeout(timeout);
-      if (mounted) setProfileLoading(false);
       if (profileAbort.current === controller) {
+        setProfileLoading(false);
         profileAbort.current = null;
       }
     }
