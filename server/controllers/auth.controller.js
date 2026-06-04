@@ -166,22 +166,31 @@ const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
+    console.log('INPUT EMAIL:', email);
+    console.log('INPUT PASSWORD LENGTH:', password?.length);
+
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
       .eq('email', email.toLowerCase())
       .single();
 
+    console.log('USER FOUND:', user);
+    console.log('USER ERROR:', error);
+
     if (error || !user) {
       console.error("Supabase error:", error);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
+
+    console.log('STORED HASH:', user.password_hash);
 
     if (!user.password_hash) {
       return res.status(401).json({ message: 'Please sign in with Google' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
+    console.log('PASSWORD MATCH:', isMatch);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
