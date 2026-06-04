@@ -214,7 +214,7 @@ const login = async (req, res, next) => {
     });
   } catch (err) {
     console.error("Login error FULL:", err);
-    next(err);
+    return res.status(500).json({ message: 'Server error during login' });
   }
 };
 

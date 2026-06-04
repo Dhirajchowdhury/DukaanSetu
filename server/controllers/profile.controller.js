@@ -563,7 +563,7 @@ const getSellerProfile = async (req, res, next) => {
     });
   } catch (error) {
     console.error(`[API REQUEST ${reqId}] Error in getSellerProfile:`, error);
-    next(error);
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 

@@ -27,6 +27,7 @@ import StockHistoryPage from './pages/StockHistoryPage';
 import ProductRankingPage from './pages/ProductRankingPage';
 import PendingDuesPage from './pages/PendingDuesPage';
 import BuyerProfilePage from './pages/BuyerProfilePage';
+import PublicProfile from './pages/PublicProfile';
 import ExpensesPage from './pages/ExpensesPage';
 import FinancePage from './pages/FinancePage';
 import CustomersPage from './pages/CustomersPage';
@@ -151,7 +152,7 @@ function App() {
               <PrivateRoute><Connect /></PrivateRoute>
             } />
             <Route path="/profile/:id" element={
-              <PrivateRoute><Connect /></PrivateRoute>
+              <PrivateRoute><PublicProfile /></PrivateRoute>
             } />
             <Route path="/connections" element={
               <PrivateRoute><Connections /></PrivateRoute>
