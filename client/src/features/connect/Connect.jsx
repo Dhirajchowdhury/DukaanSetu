@@ -331,6 +331,7 @@ const ConnectFeature = () => {
   const [sellerListings, setSellerListings] = useState([]);
   const [sellerProducts, setSellerProducts] = useState([]);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState(null);
   const [profileCache, setProfileCache] = useState({});
 
   // Chat System states
@@ -782,6 +783,7 @@ const ConnectFeature = () => {
     if (currentProfileId.current === userId) return;
     currentProfileId.current = userId;
 
+    let mounted = true;
     const isDev = process.env.NODE_ENV !== 'production';
 
     // Abort any in-flight fetch for a previous user
@@ -789,26 +791,30 @@ const ConnectFeature = () => {
       profileAbort.current.abort();
     }
     const controller = new AbortController();
+    const timeout = setTimeout(() => { if (controller && !controller.signal.aborted) controller.abort(); }, 15000);
     profileAbort.current = controller;
 
     setProfileLoading(true);
+    setProfileError(null);
     setSelectedSellerId(userId);
 
     // Evaluate cache hit
     if (profileCache[userId]) {
+      clearTimeout(timeout);
       if (isDev) {
         console.log(`[viewSellerProfile] Cache hit for id: ${userId}`);
       }
+      if (!mounted) return;
       setSellerProfile(profileCache[userId].seller);
       setSellerListings(profileCache[userId].listings || []);
       setProfileLoading(false);
 
       try {
         const prodRes = await api.get(`/profile/products/${userId}`, { signal: controller.signal });
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || !mounted) return;
         setSellerProducts(prodRes.data?.products || []);
       } catch {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || !mounted) return;
         setSellerProducts([]);
       }
       return;
@@ -820,7 +826,8 @@ const ConnectFeature = () => {
 
     try {
       const { data } = await api.get(`/profile/${userId}`, { signal: controller.signal });
-      if (controller.signal.aborted) return;
+      clearTimeout(timeout);
+      if (controller.signal.aborted || !mounted) return;
 
       // 404 from backend
       if (!data.seller) {
@@ -842,18 +849,20 @@ const ConnectFeature = () => {
 
       try {
         const prodRes = await api.get(`/profile/products/${userId}`, { signal: controller.signal });
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || !mounted) return;
         console.log("[SELLER PRODUCTS] Response:", prodRes.data);
         setSellerProducts(prodRes.data?.products || []);
       } catch (prodErr) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || !mounted) return;
         console.error("[SELLER PRODUCTS] Error:", prodErr);
         setSellerProducts([]);
       }
     } catch (error) {
-      if (controller.signal.aborted) {
+      clearTimeout(timeout);
+      if (controller.signal.aborted || !mounted) {
         setSelectedSellerId(null);
         setProfileLoading(false);
+        setProfileError('Could not load profile. Please try again.');
         return;
       }
       if (isDev) {
@@ -864,10 +873,12 @@ const ConnectFeature = () => {
       } else {
         toast.error('Failed to load seller details');
       }
+      setProfileError('Could not load profile. Please try again.');
       setSelectedSellerId(null);
       navigate('/connect');
     } finally {
-      setProfileLoading(false);
+      clearTimeout(timeout);
+      if (mounted) setProfileLoading(false);
       if (profileAbort.current === controller) {
         profileAbort.current = null;
       }
@@ -883,9 +894,11 @@ const ConnectFeature = () => {
       setSellerProfile(null);
       setSellerListings([]);
       setSellerProducts([]);
+      setProfileError(null);
     }
     return () => {
       currentProfileId.current = null;
+      setProfileError(null);
       if (profileAbort.current) {
         profileAbort.current.abort();
         profileAbort.current = null;
@@ -1893,6 +1906,15 @@ const ConnectFeature = () => {
 
           {profileLoading ? (
             <ProfileSkeleton />
+          ) : profileError ? (
+            <div className="card empty-state animate-fade-in" style={{ padding: '40px', textAlign: 'center' }}>
+              <div className="empty-state-icon" style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+              <h3>Could not load profile</h3>
+              <p style={{ color: 'var(--text-secondary)' }}>{profileError}</p>
+              <button onClick={() => { setSelectedSellerId(null); navigate('/connect'); }} className="btn btn-primary" style={{ marginTop: '16px' }}>
+                ← Back to Directory
+              </button>
+            </div>
           ) : (
             sellerProfileView
           )}
